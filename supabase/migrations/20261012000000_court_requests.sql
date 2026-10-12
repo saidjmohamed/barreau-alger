@@ -22,6 +22,9 @@ create table if not exists public.profiles (
   )
 );
 
+create unique index if not exists profiles_one_assistant_per_court
+  on public.profiles (court_id) where role = 'assistant';
+
 create table if not exists public.court_requests (
   id uuid primary key default gen_random_uuid(),
   court_id uuid not null references public.courts(id),
