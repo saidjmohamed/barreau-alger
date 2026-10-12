@@ -54,6 +54,11 @@ Deno.serve(async (req) => {
     .from("courts").select("id,name,active").eq("id", courtId).maybeSingle();
   if (courtError || !court || !court.active) return json({ error: "الهيئة غير موجودة أو غير مفعلة." }, 400);
 
+  const { data: existingAssistant, error: existingError } = await adminClient
+    .from("profiles").select("id").eq("court_id", court.id).eq("role", "assistant").maybeSingle();
+  if (existingError) return json({ error: "تعذر التحقق من حساب الهيئة." }, 500);
+  if (existingAssistant) return json({ error: "يوجد حساب مساعد مسجل لهذه الهيئة بالفعل. راجع الحساب الحالي بدل إنشاء حساب مكرر." }, 409);
+
   const password = temporaryPassword();
   const { data: created, error: createError } = await adminClient.auth.admin.createUser({
     email,
