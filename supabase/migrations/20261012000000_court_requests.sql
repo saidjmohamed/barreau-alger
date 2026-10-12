@@ -32,12 +32,13 @@ create table if not exists public.court_requests (
   lawyer_full_name text not null,
   lawyer_accreditation_date date not null,
   request_type text not null check (request_type in ('advance','postpone')),
+  session_type text not null check (session_type in ('misdemeanor','civil','real_estate','family','commercial','administrative','urgent','felonies','violations','social','other')),
   hearing_date date not null,
   note text,
   status text not null default 'new'
     check (status in ('new','in_progress','completed','rejected')),
   status_note text,
-  created_by uuid not null references auth.users(id),
+  created_by uuid references auth.users(id),
   handled_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
