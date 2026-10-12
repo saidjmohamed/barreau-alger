@@ -104,12 +104,21 @@ $("requestForm").addEventListener("submit", async (e) => {
   status("تم تسجيل الطلب بنجاح.", "good");
   await loadRequests();
 });
+$("createCourtForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentProfile || currentProfile.role !== "admin") return status("هذه العملية متاحة للأدمن العام فقط.", "bad");
+  const name = $("courtNameInput").value.trim(), kind = $("courtKindInput").value;
+  if (name.length < 3) return status("أدخل اسمًا صحيحًا للهيئة.", "bad");
+  const { error } = await supabase.from("courts").insert({ name, kind, active: true });
+  if (error) return status("تعذر إضافة الهيئة: " + error.message, "bad");
+  $("createCourtForm").reset(); status("تمت إضافة الهيئة.", "good"); await loadCourts();
+});
 $("createAssistantForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!currentProfile || currentProfile.role !== "admin") return status("هذه العملية متاحة للأدمن العام فقط.", "bad");
   status("جارٍ إنشاء الحساب…");
   const { data: sessionData } = await supabase.auth.getSession();
-  const { data, error } = await supabase.functions.invoke("admin-create-assistant", {
+  const { data, error } = await supabase.functions.invoke("admin-create-court-admin", {
     body: { email: $("newEmail").value.trim(), display_name: $("newName").value.trim(), court_id: $("newCourt").value },
     headers: { Authorization: "Bearer " + sessionData.session.access_token }
   });
@@ -124,16 +133,42 @@ async function loadCourts() {
   if (error) throw error;
   let assignedCourtIds = [];
   if (currentProfile?.role === "admin") {
-    const { data: assigned, error: assignedError } = await supabase.from("profiles").select("court_id").eq("role", "assistant");
+    const { data: assigned, error: assignedError } = await supabase.from("profiles").select("court_id").eq("role", "court_admin");
     if (assignedError) throw assignedError;
     assignedCourtIds = (assigned || []).map(p => p.court_id);
   }
   const options = data.filter(c => c.active).map(c => {
     const assigned = assignedCourtIds.includes(c.id);
-    return '<option value="' + escapeHtml(c.id) + '"' + (assigned ? " disabled" : "") + '>' + escapeHtml(c.name) + (assigned ? " — له حساب مساعد" : "") + '</option>';
+    return '<option value="' + escapeHtml(c.id) + '"' + (assigned ? " disabled" : "") + '>' + escapeHtml(c.name) + (assigned ? " — له أدمن بالفعل" : "") + '</option>';
   }).join("");
-  $("newCourt").innerHTML = options;
-  $("courtLabel").textContent = currentProfile?.role === "assistant" ? (data.find(c => c.id === currentProfile.court_id)?.name || "هيئة غير محددة") : "جميع الهيئات";
+  $("newCourt").innerHTML = '<option value="">اختر الهيئة</option>' + options;
+  $("courtLabel").textContent = ["assistant","court_admin"].includes(currentProfile?.role) ? (data.find(c => c.id === currentProfile.court_id)?.name || "هيئة غير محددة") : "جميع الهيئات";
+  if (currentProfile?.role === "admin") {
+    const kinds = { council: "مجلس قضاء", court: "محكمة", annex: "ملحقة", specialized: "جهة متخصصة" };
+    $("courtRows").innerHTML = data.map(c => '<tr><td><input data-court-name="' + escapeHtml(c.id) + '" maxlength="160" value="' + escapeHtml(c.name) + '" aria-label="اسم الهيئة"></td><td><select data-court-kind="' + escapeHtml(c.id) + '" aria-label="نوع الهيئة">' + Object.entries(kinds).map(([k,v]) => '<option value="' + k + '"' + (c.kind === k ? " selected" : "") + '>' + v + '</option>').join("") + '</select></td><td>' + (c.active ? '<span class="pill">نشطة</span>' : '<span class="pill">معطلة</span>') + '</td><td><div class="actions"><button class="btn secondary" data-court-save="' + escapeHtml(c.id) + '">حفظ التعديل</button><button class="btn secondary" data-court-toggle="' + escapeHtml(c.id) + '" data-active="' + String(c.active) + '">' + (c.active ? "تعطيل" : "تفعيل") + '</button><button class="btn danger" data-court-delete="' + escapeHtml(c.id) + '">حذف نهائي</button></div></td></tr>').join("") || '<tr><td colspan="4">لا توجد هيئات.</td></tr>';
+    $("courtRows").querySelectorAll("[data-court-save]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.dataset.courtSave;
+      const name = $("courtRows").querySelector('[data-court-name="' + id + '"]').value.trim();
+      const kind = $("courtRows").querySelector('[data-court-kind="' + id + '"]').value;
+      if (name.length < 3) return status("اسم الهيئة قصير جدًا.", "bad");
+      const { error } = await supabase.from("courts").update({ name, kind }).eq("id", id);
+      if (error) return status("تعذر تعديل الهيئة: " + error.message, "bad");
+      status("تم تعديل بيانات الهيئة.", "good"); await loadCourts();
+    }));
+    $("courtRows").querySelectorAll("[data-court-toggle]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.dataset.courtToggle, active = btn.dataset.active !== "true";
+      const { error } = await supabase.from("courts").update({ active }).eq("id", id);
+      if (error) return status("تعذر تغيير حالة الهيئة: " + error.message, "bad");
+      status(active ? "تم تفعيل الهيئة." : "تم تعطيل الهيئة؛ لن تظهر في نموذج المحامي.", "good"); await loadCourts();
+    }));
+    $("courtRows").querySelectorAll("[data-court-delete]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.dataset.courtDelete;
+      if (!confirm("هل تريد الحذف النهائي؟ لا يمكن الحذف إذا كانت هناك طلبات أو حسابات مرتبطة بالهيئة.")) return;
+      const { error } = await supabase.from("courts").delete().eq("id", id);
+      if (error) return status("تعذر الحذف. غالبًا توجد طلبات أو حسابات مرتبطة؛ عطّل الهيئة بدلًا من حذف سجلها. التفاصيل: " + error.message, "bad");
+      status("تم حذف الهيئة.", "good"); await loadCourts();
+    }));
+  }
 }
 async function loadRequests() {
   const { data, error } = await supabase.from("court_requests").select("id,case_number,lawyer_full_name,lawyer_accreditation_date,client_name,client_role,request_type,session_type,hearing_date,note,status,status_note,created_at,court_id,courts(name)").order("created_at", { ascending: false }).limit(300);
@@ -169,14 +204,14 @@ async function loadApp() {
   currentProfile = profile;
   $("loginPanel").classList.add("hidden");
   $("appPanel").classList.remove("hidden");
-  $("whoami").textContent = profile.display_name + " — " + (profile.role === "admin" ? "الأدمن العام" : "مساعد الهيئة");
+  $("whoami").textContent = profile.display_name + " — " + ({admin:"الأدمن العام",court_admin:"أدمن الهيئة",assistant:"مساعد الهيئة"}[profile.role] || "مستخدم");
   $("requestFormPanel").classList.toggle("hidden", profile.role !== "assistant");
   $("adminPanel").classList.toggle("hidden", profile.role !== "admin");
   $("courtLabel").textContent = profile.role === "assistant" ? "تحميل…" : "جميع الهيئات";
   await loadCourts();
   await loadRequests();
   if (requestsChannel) await supabase.removeChannel(requestsChannel);
-  const filter = profile.role === "assistant" ? "court_id=eq." + profile.court_id : undefined;
+  const filter = ["assistant","court_admin"].includes(profile.role) ? "court_id=eq." + profile.court_id : undefined;
   requestsChannel = supabase.channel("court-requests-" + profile.id)
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "court_requests", ...(filter ? { filter } : {}) }, async () => {
       status("وصل طلب جديد إلى لوحة العمل.", "good");
@@ -193,7 +228,7 @@ else {
 </script>
 </head>
 <body>
-<header class="top"><h1>⚖ Barreau Alger</h1><p>خدمة التسبيقات والتأجيلات · الدخول مخصص لمساعدي الهيئات القضائية والأدمن العام</p></header>
+<header class="top"><h1>⚖ منظمة محامي الجزائر | Barreau Alger</h1><p><a href="./organization.html" style="color:#f0d8a8">الواجهة التعريفية للمنظمة</a> · خدمة التسبيقات والتأجيلات · حسابات مسؤولي الهيئات والأدمن العام</p></header>
 <main class="wrap">
 <div class="notice">يستطيع المحامي إرسال الطلب دون إنشاء حساب. اختر الهيئة القضائية وحدد نوع الطلب والجلسة؛ يصل الطلب إلى لوحة مساعد الهيئة المختارة. لا تُدخل إلا البيانات المهنية اللازمة.</div>
 <section class="panel" id="publicRequestPanel">
@@ -232,13 +267,27 @@ else {
 <div class="field"><label for="hearingDate">تاريخ الجلسة</label><input id="hearingDate" type="date" required></div>
 <div class="field"><label for="requestNote">ملاحظة (اختياري)</label><textarea id="requestNote" maxlength="1000"></textarea></div>
 </div><div class="actions"><button class="btn" type="submit">تسجيل الطلب</button><button class="btn secondary" type="reset">تفريغ الحقول</button></div></form></section>
-<section id="adminPanel" class="panel hidden"><h2>إدارة حسابات المساعدين</h2><p class="muted">ينشئ الأدمن حسابًا واحدًا لكل هيئة قضائية. كلمة المرور المؤقتة تظهر مرة واحدة بعد الإنشاء.</p>
+<section id="adminPanel" class="panel hidden">
+<h2>إدارة المنصة والهيئات</h2><p class="muted">هذه الصلاحيات مخصصة للأدمن العام فقط. كلمة مرور المسؤول الجديد تظهر مرة واحدة بعد إنشاء الحساب.</p>
+<div class="panel" style="padding:15px;margin:14px 0">
+<h3>إضافة هيئة قضائية</h3>
+<form id="createCourtForm"><div class="grid">
+<div class="field"><label for="courtNameInput">اسم المحكمة أو المجلس</label><input id="courtNameInput" maxlength="160" required></div>
+<div class="field"><label for="courtKindInput">نوع الهيئة</label><select id="courtKindInput" required><option value="court">محكمة</option><option value="council">مجلس قضاء</option><option value="annex">ملحقة</option><option value="specialized">جهة متخصصة</option></select></div>
+</div><div class="actions"><button class="btn" type="submit">إضافة الهيئة</button></div></form>
+</div>
+<div class="panel" style="padding:15px;margin:14px 0">
+<h3>إنشاء حساب أدمن لهيئة</h3><p class="muted">أدخل بريدًا إلكترونيًا صالحًا للمسؤول. لا تنشئ حسابات ببريد لا تملكه الهيئة أو لا يمكنها استلامه.</p>
 <form id="createAssistantForm"><div class="grid">
-<div class="field"><label for="newName">اسم المساعد</label><input id="newName" maxlength="160" required></div>
+<div class="field"><label for="newName">اسم المسؤول</label><input id="newName" maxlength="160" required></div>
 <div class="field"><label for="newEmail">البريد الإلكتروني للحساب</label><input id="newEmail" type="email" autocomplete="off" required></div>
 <div class="field"><label for="newCourt">الهيئة القضائية</label><select id="newCourt" required></select></div>
-</div><div class="actions"><button class="btn" type="submit">إنشاء حساب مساعد</button></div></form>
-<div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div></section>
+</div><div class="actions"><button class="btn" type="submit">إنشاء حساب أدمن للهيئة</button></div></form>
+<div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div>
+</div>
+<h3>قائمة الهيئات وصلاحياتها</h3><p class="muted">يمكن تعديل اسم الهيئة أو تفعيلها وتعطيلها. الحذف النهائي متاح فقط عندما لا توجد طلبات أو حسابات مرتبطة بها.</p>
+<div class="tablewrap"><table style="min-width:650px"><thead><tr><th>اسم الهيئة</th><th>النوع</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="courtRows"><tr><td colspan="4">جارٍ تحميل الهيئات…</td></tr></tbody></table></div>
+</section>
 <section class="panel"><div class="toolbar"><div><h2>الطلبات المسجلة</h2><div class="muted">تظهر للمساعد طلبات هيئته فقط، وللأدمن العام جميع الطلبات.</div></div><button class="btn secondary" id="refresh" type="button">تحديث القائمة</button></div><div class="tablewrap"><table><thead><tr><th>رقم القضية</th><th>الموكل وصفته</th><th>المحامي</th><th>الهيئة</th><th>الطلب والجلسة</th><th>تاريخ الجلسة</th><th>الحالة / الإجراء</th><th>ملاحظة</th></tr></thead><tbody id="requestRows"><tr><td colspan="8">سجّل الدخول لعرض الطلبات.</td></tr></tbody></table></div></section>
 </section>
 <div id="status" class="status" role="status" aria-live="polite"></div>
