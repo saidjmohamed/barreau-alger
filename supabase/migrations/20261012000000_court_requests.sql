@@ -66,31 +66,31 @@ alter table public.court_requests enable row level security;
 -- Authorization is based on server-managed app_metadata claims, never user_metadata.
 create policy "authenticated users can read active courts"
 on public.courts for select to authenticated
-using (active = true or (select auth.jwt())->'app_metadata'->>'role' = 'admin');
+using (active = true or ((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true'));
 
 create policy "admins manage courts"
 on public.courts for all to authenticated
-using ((select auth.jwt())->'app_metadata'->>'role' = 'admin')
-with check ((select auth.jwt())->'app_metadata'->>'role' = 'admin');
+using (((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true'))
+with check (((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true'));
 
 create policy "users read own profile and admins read all"
 on public.profiles for select to authenticated
 using (
   id = (select auth.uid()) or
-  (select auth.jwt())->'app_metadata'->>'role' = 'admin'
+  ((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
 );
 
 create policy "admins read all court requests and assistants read own court"
 on public.court_requests for select to authenticated
 using (
-  (select auth.jwt())->'app_metadata'->>'role' = 'admin'
+  ((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
   or court_id::text = ((select auth.jwt())->'app_metadata'->>'court_id')
 );
 
 create policy "assistants create requests for their own court"
 on public.court_requests for insert to authenticated
 with check (
-  (select auth.jwt())->'app_metadata'->>'role' = 'assistant'
+  ((select auth.jwt())->'app_metadata'->>'role' = 'assistant' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
   and court_id::text = ((select auth.jwt())->'app_metadata'->>'court_id')
   and created_by = (select auth.uid())
 );
@@ -98,23 +98,23 @@ with check (
 create policy "admins and same-court assistants update requests"
 on public.court_requests for update to authenticated
 using (
-  (select auth.jwt())->'app_metadata'->>'role' = 'admin'
+  ((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
   or (
-    (select auth.jwt())->'app_metadata'->>'role' = 'assistant'
+    ((select auth.jwt())->'app_metadata'->>'role' = 'assistant' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
     and court_id::text = ((select auth.jwt())->'app_metadata'->>'court_id')
   )
 )
 with check (
-  (select auth.jwt())->'app_metadata'->>'role' = 'admin'
+  ((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
   or (
-    (select auth.jwt())->'app_metadata'->>'role' = 'assistant'
+    ((select auth.jwt())->'app_metadata'->>'role' = 'assistant' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
     and court_id::text = ((select auth.jwt())->'app_metadata'->>'court_id')
   )
 );
 
 create policy "admins delete requests"
 on public.court_requests for delete to authenticated
-using ((select auth.jwt())->'app_metadata'->>'role' = 'admin');
+using (((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true'));
 
 revoke all on public.courts, public.profiles, public.court_requests from anon;
 grant select, insert, update, delete on public.courts to authenticated;
