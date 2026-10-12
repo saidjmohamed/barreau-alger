@@ -68,7 +68,16 @@ $("createAssistantForm").addEventListener("submit", async (e) => {
 async function loadCourts() {
   const { data, error } = await supabase.from("courts").select("id,name,kind,active").order("name");
   if (error) throw error;
-  const options = data.filter(c => c.active).map(c => '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>').join("");
+  let assignedCourtIds = [];
+  if (currentProfile?.role === "admin") {
+    const { data: assigned, error: assignedError } = await supabase.from("profiles").select("court_id").eq("role", "assistant");
+    if (assignedError) throw assignedError;
+    assignedCourtIds = (assigned || []).map(p => p.court_id);
+  }
+  const options = data.filter(c => c.active).map(c => {
+    const assigned = assignedCourtIds.includes(c.id);
+    return '<option value="' + escapeHtml(c.id) + '"' + (assigned ? " disabled" : "") + '>' + escapeHtml(c.name) + (assigned ? " — له حساب مساعد" : "") + '</option>';
+  }).join("");
   $("newCourt").innerHTML = options;
   $("courtLabel").textContent = currentProfile?.role === "assistant" ? (data.find(c => c.id === currentProfile.court_id)?.name || "هيئة غير محددة") : "جميع الهيئات";
 }
