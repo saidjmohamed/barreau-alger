@@ -46,6 +46,32 @@
 - بيانات العنوان والاتصال واللجان مستخلصة من الصفحات العامة للموقع الرسمي وقت إعداد الواجهة. لا تدّعي الصفحة اعتمادًا رسميًا أو شراكة، وتوجّه الزائر إلى المصدر الأصلي للتحقق من التحديثات.
 - المصدر: https://www.barreau-alger.org/ ؛ https://www.barreau-alger.org/v1/front/centre ؛ https://www.barreau-alger.org/v1/front/contacts
 
+## إنشاء أول حساب للأدمن العام (مرة واحدة)
+1. من Supabase Dashboard افتح Authentication → Users وأنشئ مستخدمًا بالبريد الإلكتروني الذي تملكه وتريد تخصيصه للأدمن العام. لا تستخدم بريدًا افتراضيًا.
+2. انسخ UUID الخاص بالمستخدم، ثم افتح SQL Editor ونفّذ الاستعلام التالي بعد استبدال `AUTH_USER_UUID` و`اسم الأدمن العام` بالقيم الصحيحة:
+
+```sql
+-- لا تنفذ هذا قبل إنشاء المستخدم في Authentication → Users.
+update auth.users
+set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb)
+  || '{"role":"admin","active":true}'::jsonb
+where id = 'AUTH_USER_UUID'::uuid;
+
+insert into public.profiles (id, display_name, role, court_id, active)
+select id, 'اسم الأدمن العام', 'admin', null, true
+from auth.users
+where id = 'AUTH_USER_UUID'::uuid
+on conflict (id) do update
+set display_name = excluded.display_name,
+    role = 'admin',
+    court_id = null,
+    active = true;
+```
+
+3. سجّل الخروج ثم الدخول من جديد حتى يحصل الحساب على JWT claims المحدّثة. بعد ذلك افتح لوحة التسبيقات والتأجيلات؛ ستظهر لوحة إدارة الهيئات وإنشاء حساب أدمن لكل هيئة.
+4. أنشئ لكل هيئة حسابًا ببريد فعلي تابع للمسؤول المعني. كلمة المرور المؤقتة تظهر مرة واحدة؛ سلّمها عبر قناة آمنة واطلب تغييرها بعد أول دخول.
+5. لا تنشئ حسابات بهويات أو عناوين بريد مختلقة، ولا تشارك كلمة مرور الأدمن العام.
+
 ## ملاحظات إدارة الهيئات
 - يمكن للأدمن العام إضافة هيئة، وتعديل اسمها ونوعها، وتفعيلها أو تعطيلها، ومحاولة حذفها نهائيًا.
 - الحذف النهائي سيفشل بأمان عند وجود طلبات أو حسابات مرتبطة بسبب قيود المفاتيح الخارجية؛ في هذه الحالة عطّل الهيئة بدل حذف سجلها.
