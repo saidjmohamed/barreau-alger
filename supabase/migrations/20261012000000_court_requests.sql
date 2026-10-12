@@ -84,7 +84,7 @@ create policy "admins read all court requests and assistants read own court"
 on public.court_requests for select to authenticated
 using (
   ((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true')
-  or court_id::text = ((select auth.jwt())->'app_metadata'->>'court_id')
+  or (((select auth.jwt())->'app_metadata'->>'role' = 'assistant') and ((select auth.jwt())->'app_metadata'->>'active' = 'true') and court_id::text = ((select auth.jwt())->'app_metadata'->>'court_id'))
 );
 
 create policy "assistants create requests for their own court"
