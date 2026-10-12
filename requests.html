@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10243a">
+<title>Barreau Alger | التسبيقات والتأجيلات</title>
+<style>
+:root{--navy:#10243a;--blue:#1b3d59;--gold:#c5a46d;--paper:#f4f6f9;--ink:#172638;--muted:#657587;--line:#dce3ea;--red:#a83232;--green:#176c43}*{box-sizing:border-box}.brandline{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap}.org-logo{width:74px;height:74px;flex:0 0 74px}body{margin:0;background:var(--paper);color:var(--ink);font-family:Tahoma,Arial,sans-serif;line-height:1.65}input,select,textarea,button{font:inherit}button{cursor:pointer}.top{background:linear-gradient(125deg,var(--navy),var(--blue));color:white;padding:22px max(18px,calc((100vw - 1100px)/2));border-bottom:4px solid var(--gold)}h1{margin:0;font-size:23px}.top p{margin:4px 0 0;color:#e1e8ef;font-size:13px}.wrap{max-width:1100px;margin:24px auto;padding:0 18px}.notice{background:#fff8e9;border:1px solid #ead7af;color:#70531d;border-radius:12px;padding:12px 15px;margin-bottom:16px;font-size:13px}.panel{background:white;border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:0 4px 16px #10243a08}.hidden{display:none!important}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.field{display:flex;flex-direction:column;gap:5px}.field label{font-size:13px;font-weight:bold}.field input,.field select,.field textarea{border:1px solid #cbd5df;border-radius:8px;padding:10px;background:#fff;min-width:0}.field textarea{min-height:75px;resize:vertical}.btn{border:0;border-radius:9px;background:var(--navy);color:white;padding:10px 15px;font-weight:bold}.btn.secondary{background:#edf1f5;color:var(--navy);border:1px solid var(--line)}.btn.danger{background:#a83232}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.status{white-space:pre-wrap;font-size:13px;margin-top:12px}.good{color:var(--green)}.bad{color:var(--red)}h2{margin:0 0 8px;color:var(--navy);font-size:20px}h3{margin:0 0 10px;font-size:16px;color:var(--navy)}.muted{color:var(--muted);font-size:13px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;font-size:13px;min-width:700px}th,td{text-align:right;padding:10px;border-bottom:1px solid var(--line);vertical-align:top}th{background:#f3f6f9}.pill{display:inline-block;border-radius:20px;padding:3px 8px;background:#edf1f5;font-size:12px}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:12px}.toolbar .field{min-width:180px;flex:1}.copybox{background:#f5f7fa;border:1px dashed #aab8c7;padding:12px;border-radius:9px;overflow-wrap:anywhere}.footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}@media(max-width:680px){.grid{grid-template-columns:1fr}.panel{padding:15px}.top{padding:18px}.wrap{padding:0 12px}}
+</style>
+<script type="module" id="app">
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.54.0";
+
+// ضع عنوان مشروع Supabase ومفتاح publishable/anon هنا بعد إعداد المشروع.
+// لا تضع service_role أو أي مفتاح سري في هذا الملف.
+const SUPABASE_URL = "https://iivwofxxogillblumlhv.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_11zgv5lruoMnkx9NbLM8Eg_mhac62sy";
+const configured = !SUPABASE_URL.startsWith("YOUR_") && !SUPABASE_PUBLISHABLE_KEY.startsWith("YOUR_");
+const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
+const $ = (id) => document.getElementById(id);
+const status = (message, type = "") => { $("status").textContent = message; $("status").className = "status " + type; };
+const escapeHtml = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const role = () => supabase?.auth.getSession();
+let currentProfile = null;
+let requestsChannel = null;
+
+const sessionLabels = {
+  misdemeanor: "جنح", civil: "مدني", real_estate: "عقاري", family: "شؤون الأسرة",
+  commercial: "تجاري", administrative: "إداري", urgent: "استعجالي",
+  felonies: "جنايات", violations: "مخالفات", social: "اجتماعي", other: "أخرى"
+};
+const requestLabels = { advance: "تسبيق (مرافعة)", postpone: "تأجيل" };
+
+$("publicRequestForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!configured) return $("publicStatus").textContent = "الخدمة غير مهيأة بعد؛ لم يتم إرسال أي طلب.";
+  const submit = $("publicSubmit");
+  submit.disabled = true;
+  $("publicStatus").className = "status";
+  $("publicStatus").textContent = "جارٍ إرسال الطلب إلى مساعد الهيئة المختارة…";
+  const payload = {
+    court_id: $("publicCourt").value,
+    lawyer_full_name: $("publicLawyerName").value.trim(),
+    lawyer_accreditation_date: $("publicAccreditationDate").value,
+    client_name: $("publicClientName").value.trim(),
+    client_role: $("publicClientRole").value,
+    request_type: $("publicRequestType").value,
+    session_type: $("publicSessionType").value,
+    hearing_date: $("publicHearingDate").value,
+    case_number: $("publicCaseNumber").value.trim(),
+    note: $("publicNote").value.trim(),
+    website: $("publicWebsite").value
+  };
+  try {
+    const { data, error } = await supabase.functions.invoke("submit-court-request", { body: payload });
+    if (error || data?.error || !data?.ok) throw new Error(data?.error || error?.message || "تعذر إرسال الطلب.");
+    $("publicRequestForm").reset();
+    $("publicStatus").className = "status good";
+    $("publicStatus").textContent = "تم إرسال الطلب إلى " + data.court_name + " بنجاح. احتفظ ببياناتك للمتابعة عبر الهيئة.";
+  } catch (err) {
+    $("publicStatus").className = "status bad";
+    $("publicStatus").textContent = err.message || "تعذر إرسال الطلب. حاول لاحقًا.";
+  } finally { submit.disabled = false; }
+});
+
+async function loadPublicCourts() {
+  if (!configured) return;
+  const { data, error } = await supabase.from("courts").select("id,name").eq("active", true).order("name");
+  if (error) {
+    $("publicStatus").textContent = "تعذر تحميل قائمة الهيئات. يرجى المحاولة لاحقًا.";
+    return;
+  }
+  $("publicCourt").innerHTML = '<option value="">اختر المحكمة أو المجلس</option>' +
+    data.map(c => '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>').join("");
+}
+
+$("loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!configured) return status("لم تُضبط بيانات Supabase بعد. راجع supabase/README.md.", "bad");
+  status("جارٍ تسجيل الدخول…");
+  const { error } = await supabase.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+  if (error) return status("تعذر تسجيل الدخول: " + error.message, "bad");
+  await loadApp();
+});
+$("logout").addEventListener("click", async () => { await supabase.auth.signOut(); location.reload(); });
+$("requestForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentProfile || currentProfile.role !== "assistant") return status("هذه العملية متاحة لمساعد الهيئة فقط.", "bad");
+  const payload = {
+    court_id: currentProfile.court_id,
+    case_number: $("caseNumber").value.trim(),
+    lawyer_full_name: $("lawyerName").value.trim(),
+    lawyer_accreditation_date: $("accreditationDate").value,
+    client_name: $("clientName").value.trim(),
+    client_role: $("clientRole").value,
+    request_type: $("requestType").value,
+    session_type: $("assistantSessionType").value,
+    hearing_date: $("hearingDate").value,
+    note: $("requestNote").value.trim() || null,
+    created_by: (await supabase.auth.getUser()).data.user.id
+  };
+  const { error } = await supabase.from("court_requests").insert(payload);
+  if (error) return status("تعذر حفظ الطلب: " + error.message, "bad");
+  $("requestForm").reset();
+  status("تم تسجيل الطلب بنجاح.", "good");
+  await loadRequests();
+});
+$("createCourtForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentProfile || currentProfile.role !== "admin") return status("هذه العملية متاحة للأدمن العام فقط.", "bad");
+  const name = $("courtNameInput").value.trim(), kind = $("courtKindInput").value;
+  if (name.length < 3) return status("أدخل اسمًا صحيحًا للهيئة.", "bad");
+  const { error } = await supabase.from("courts").insert({ name, kind, active: true });
+  if (error) return status("تعذر إضافة الهيئة: " + error.message, "bad");
+  $("createCourtForm").reset(); status("تمت إضافة الهيئة.", "good"); await loadCourts();
+});
+$("createAssistantForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!currentProfile || currentProfile.role !== "admin") return status("هذه العملية متاحة للأدمن العام فقط.", "bad");
+  status("جارٍ إنشاء الحساب…");
+  const { data: sessionData } = await supabase.auth.getSession();
+  const { data, error } = await supabase.functions.invoke("admin-create-court-admin", {
+    body: { email: $("newEmail").value.trim(), display_name: $("newName").value.trim(), court_id: $("newCourt").value },
+    headers: { Authorization: "Bearer " + sessionData.session.access_token }
+  });
+  if (error || data?.error) return status("تعذر إنشاء الحساب: " + (data?.error || error.message), "bad");
+  $("credentialResult").classList.remove("hidden");
+  $("credentialResult").innerHTML = "<strong>تم إنشاء الحساب. انسخ كلمة المرور الآن واحفظها بأمان؛ لن تظهر مجددًا.</strong><div class='copybox'>البريد: " + escapeHtml(data.email) + "<br>المسؤول: " + escapeHtml(data.display_name) + "<br>الهيئة: " + escapeHtml(data.court_name) + "<br>كلمة المرور المؤقتة: <strong>" + escapeHtml(data.temporary_password) + "</strong></div>";
+  $("createAssistantForm").reset();
+  status("تم إنشاء حساب أدمن الهيئة.", "good");
+});
+async function loadCourts() {
+  const { data, error } = await supabase.from("courts").select("id,name,kind,active").order("name");
+  if (error) throw error;
+  let assignedCourtIds = [];
+  if (currentProfile?.role === "admin") {
+    const { data: assigned, error: assignedError } = await supabase.from("profiles").select("court_id").eq("role", "court_admin");
+    if (assignedError) throw assignedError;
+    assignedCourtIds = (assigned || []).map(p => p.court_id);
+  }
+  const options = data.filter(c => c.active).map(c => {
+    const assigned = assignedCourtIds.includes(c.id);
+    return '<option value="' + escapeHtml(c.id) + '"' + (assigned ? " disabled" : "") + '>' + escapeHtml(c.name) + (assigned ? " — له أدمن بالفعل" : "") + '</option>';
+  }).join("");
+  $("newCourt").innerHTML = '<option value="">اختر الهيئة</option>' + options;
+  $("courtLabel").textContent = ["assistant","court_admin"].includes(currentProfile?.role) ? (data.find(c => c.id === currentProfile.court_id)?.name || "هيئة غير محددة") : "جميع الهيئات";
+  if (currentProfile?.role === "admin") {
+    const kinds = { council: "مجلس قضاء", court: "محكمة", annex: "ملحقة", specialized: "جهة متخصصة" };
+    $("courtRows").innerHTML = data.map(c => '<tr><td><input data-court-name="' + escapeHtml(c.id) + '" maxlength="160" value="' + escapeHtml(c.name) + '" aria-label="اسم الهيئة"></td><td><select data-court-kind="' + escapeHtml(c.id) + '" aria-label="نوع الهيئة">' + Object.entries(kinds).map(([k,v]) => '<option value="' + k + '"' + (c.kind === k ? " selected" : "") + '>' + v + '</option>').join("") + '</select></td><td>' + (c.active ? '<span class="pill">نشطة</span>' : '<span class="pill">معطلة</span>') + '</td><td><div class="actions"><button class="btn secondary" data-court-save="' + escapeHtml(c.id) + '">حفظ التعديل</button><button class="btn secondary" data-court-toggle="' + escapeHtml(c.id) + '" data-active="' + String(c.active) + '">' + (c.active ? "تعطيل" : "تفعيل") + '</button><button class="btn danger" data-court-delete="' + escapeHtml(c.id) + '">حذف نهائي</button></div></td></tr>').join("") || '<tr><td colspan="4">لا توجد هيئات.</td></tr>';
+    $("courtRows").querySelectorAll("[data-court-save]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.dataset.courtSave;
+      const name = $("courtRows").querySelector('[data-court-name="' + id + '"]').value.trim();
+      const kind = $("courtRows").querySelector('[data-court-kind="' + id + '"]').value;
+      if (name.length < 3) return status("اسم الهيئة قصير جدًا.", "bad");
+      const { error } = await supabase.from("courts").update({ name, kind }).eq("id", id);
+      if (error) return status("تعذر تعديل الهيئة: " + error.message, "bad");
+      status("تم تعديل بيانات الهيئة.", "good"); await loadCourts();
+    }));
+    $("courtRows").querySelectorAll("[data-court-toggle]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.dataset.courtToggle, active = btn.dataset.active !== "true";
+      const { error } = await supabase.from("courts").update({ active }).eq("id", id);
+      if (error) return status("تعذر تغيير حالة الهيئة: " + error.message, "bad");
+      status(active ? "تم تفعيل الهيئة." : "تم تعطيل الهيئة؛ لن تظهر في نموذج المحامي.", "good"); await loadCourts();
+    }));
+    $("courtRows").querySelectorAll("[data-court-delete]").forEach(btn => btn.addEventListener("click", async () => {
+      const id = btn.dataset.courtDelete;
+      if (!confirm("هل تريد الحذف النهائي؟ لا يمكن الحذف إذا كانت هناك طلبات أو حسابات مرتبطة بالهيئة.")) return;
+      const { error } = await supabase.from("courts").delete().eq("id", id);
+      if (error) return status("تعذر الحذف. غالبًا توجد طلبات أو حسابات مرتبطة؛ عطّل الهيئة بدلًا من حذف سجلها. التفاصيل: " + error.message, "bad");
+      status("تم حذف الهيئة.", "good"); await loadCourts();
+    }));
+  }
+}
+async function loadRequests() {
+  const { data, error } = await supabase.from("court_requests").select("id,case_number,lawyer_full_name,lawyer_accreditation_date,client_name,client_role,request_type,session_type,hearing_date,note,status,status_note,created_at,court_id,courts(name)").order("created_at", { ascending: false }).limit(300);
+  if (error) return status("تعذر تحميل الطلبات: " + error.message, "bad");
+  const labels = { new: "جديد", in_progress: "قيد المعالجة", completed: "تم", rejected: "مرفوض" };
+  const clientRoleLabels = { defendant: "المتهم", victim: "الضحية" };
+  $("requestRows").innerHTML = data.map(r => {
+    const admin = currentProfile.role === "admin";
+    const canEdit = admin || currentProfile.court_id === r.court_id;
+    const courtName = r.courts?.name || "";
+    const statusControl = canEdit ? '<select data-status="' + escapeHtml(r.id) + '">' + ["new","in_progress","completed","rejected"].map(s => '<option value="' + s + '"' + (r.status === s ? " selected" : "") + '>' + labels[s] + '</option>').join("") + '</select><input data-note="' + escapeHtml(r.id) + '" placeholder="ملاحظة الحالة" value="' + escapeHtml(r.status_note || "") + '"><button class="btn secondary" data-save="' + escapeHtml(r.id) + '">حفظ</button>' : '<span class="pill">' + labels[r.status] + '</span>';
+    return '<tr><td>' + escapeHtml(r.case_number) + '</td><td>' + escapeHtml(r.client_name) + '<br><span class="muted">' + (clientRoleLabels[r.client_role] || "—") + '</span></td><td>' + escapeHtml(r.lawyer_full_name) + '<br><span class="muted">تاريخ الاعتماد: ' + escapeHtml(r.lawyer_accreditation_date) + '</span></td><td>' + escapeHtml(courtName) + '</td><td>' + requestLabels[r.request_type] + '<br><span class="muted">' + (sessionLabels[r.session_type] || "—") + '</span></td><td>' + escapeHtml(r.hearing_date) + '</td><td>' + statusControl + '</td><td>' + escapeHtml(r.note || "") + '</td></tr>';
+  }).join("") || '<tr><td colspan="8">لا توجد طلبات مسجلة.</td></tr>';
+  $("requestRows").querySelectorAll("[data-save]").forEach(btn => btn.addEventListener("click", async () => {
+    const id = btn.dataset.save, statusValue = $("requestRows").querySelector('[data-status="' + id + '"]').value;
+    const statusNote = $("requestRows").querySelector('[data-note="' + id + '"]').value.trim() || null;
+    const user = (await supabase.auth.getUser()).data.user;
+    const { error } = await supabase.from("court_requests").update({ status: statusValue, status_note: statusNote, handled_by: user.id }).eq("id", id);
+    if (error) status("تعذر تحديث الحالة: " + error.message, "bad");
+    else { status("تم تحديث حالة الطلب.", "good"); await loadRequests(); }
+  }));
+}
+async function loadApp() {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) return;
+  const user = userData.user, claims = user.app_metadata || {};
+  if (claims.active === false) { await supabase.auth.signOut(); return status("هذا الحساب معطل. راجع الأدمن العام.", "bad"); }
+  const { data: profile, error } = await supabase.from("profiles").select("id,display_name,role,court_id,active").eq("id", user.id).maybeSingle();
+  if (error || !profile || !profile.active || profile.role !== claims.role) {
+    await supabase.auth.signOut();
+    return status("الحساب غير مهيأ بصورة صحيحة. يرجى مراجعة الأدمن العام.", "bad");
+  }
+  currentProfile = profile;
+  $("loginPanel").classList.add("hidden");
+  $("appPanel").classList.remove("hidden");
+  $("whoami").textContent = profile.display_name + " — " + ({admin:"الأدمن العام",court_admin:"أدمن الهيئة",assistant:"مساعد الهيئة"}[profile.role] || "مستخدم");
+  $("requestFormPanel").classList.toggle("hidden", profile.role !== "assistant");
+  $("adminPanel").classList.toggle("hidden", profile.role !== "admin");
+  $("courtLabel").textContent = profile.role === "assistant" ? "تحميل…" : "جميع الهيئات";
+  await loadCourts();
+  await loadRequests();
+  if (requestsChannel) await supabase.removeChannel(requestsChannel);
+  const filter = ["assistant","court_admin"].includes(profile.role) ? "court_id=eq." + profile.court_id : undefined;
+  requestsChannel = supabase.channel("court-requests-" + profile.id)
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "court_requests", ...(filter ? { filter } : {}) }, async () => {
+      status("وصل طلب جديد إلى لوحة العمل.", "good");
+      await loadRequests();
+    })
+    .subscribe();
+}
+if (!configured) status("واجهة تجريبية غير متصلة: اضبط SUPABASE_URL والمفتاح العام بعد إعداد قاعدة البيانات.");
+else {
+  loadPublicCourts();
+  const { data } = await supabase.auth.getSession();
+  if (data.session) loadApp().catch(e => status("حدث خطأ أثناء تحميل التطبيق: " + e.message, "bad"));
+}
+</script>
+</head>
+<body>
+<header class="top"><div class="brandline"><svg class="org-logo" viewBox="0 0 160 160" role="img" aria-label="شعار منظمة محامي الجزائر" xmlns="http://www.w3.org/2000/svg"><circle cx="80" cy="80" r="75" fill="#050505" stroke="#c8a65e" stroke-width="2.4"/><circle cx="80" cy="80" r="66" fill="none" stroke="#c8a65e" stroke-width="1"/><g fill="none" stroke="#d4b36a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M80 36V94M51 48H109M80 37l-5 7h10z"/><path d="M51 48L36 75M51 48l15 27M109 48L94 75M109 48l15 27"/><path d="M28 75Q51 89 74 75M86 75Q109 89 132 75"/><path d="M80 94l-8 9h16zM61 108h38l8 9H53zM58 121h44M63 126h34"/><path d="M27 98v22M22 120h10M133 98v22M128 120h10"/></g><g fill="#e0c17c" font-family="Tahoma,Arial,sans-serif" text-anchor="middle"><text x="80" y="20" font-size="8.3" font-weight="bold">منظمة محامي الجزائر</text><text x="80" y="143" font-size="7.3" font-weight="bold">ORDRE DES AVOCATS</text><text x="80" y="151" font-size="6.2">D'ALGER</text></g></svg><h1>منظمة محامي الجزائر | Barreau Alger</h1></div><p><a href="./index.html" style="color:#f0d8a8">العودة إلى خدمات PDF</a> · <a href="./organization.html" style="color:#f0d8a8">الواجهة التعريفية للمنظمة</a> · خدمة التسبيقات والتأجيلات · حسابات مسؤولي الهيئات والأدمن العام</p></header>
+<main class="wrap">
+<div class="notice">نموذج المحامي مصمم للإرسال دون حساب، لكن الإرسال العام موقوف مؤقتًا على مستوى الخادم حتى إعداد CAPTCHA والتحقق منه لمنع الإغراق. لا تعتمد على النموذج لإرسال طلب حقيقي قبل إتمام هذه الخطوة.</div>
+<section class="panel" id="publicRequestPanel">
+<h2>إرسال طلب تسبيق أو تأجيل</h2><p class="muted">التسبيق يعني طلب المرافعة. لا يلزم تسجيل الدخول لإرسال الطلب.</p>
+<form id="publicRequestForm"><div class="grid">
+<div class="field"><label for="publicCourt">المحكمة أو المجلس</label><select id="publicCourt" required><option value="">تحميل الهيئات…</option></select></div>
+<div class="field"><label for="publicLawyerName">اسم المحامي ولقبه</label><input id="publicLawyerName" maxlength="160" autocomplete="name" required></div>
+<div class="field"><label for="publicAccreditationDate">تاريخ الاعتماد</label><input id="publicAccreditationDate" type="date" required></div>
+<div class="field"><label for="publicClientName">اسم الموكل</label><input id="publicClientName" maxlength="160" autocomplete="off" required></div>
+<div class="field"><label for="publicClientRole">صفة الموكل في القضية</label><select id="publicClientRole" required><option value="">اختر الصفة</option><option value="defendant">المتهم</option><option value="victim">الضحية</option></select></div>
+<div class="field"><label for="publicRequestType">نوع الطلب</label><select id="publicRequestType" required><option value="">اختر نوع الطلب</option><option value="postpone">تأجيل</option><option value="advance">تسبيق (مرافعة)</option></select></div>
+<div class="field"><label for="publicSessionType">نوع الجلسة</label><select id="publicSessionType" required>
+<option value="">اختر نوع الجلسة</option><option value="misdemeanor">جنح</option><option value="civil">مدني</option><option value="real_estate">عقاري</option><option value="family">شؤون الأسرة</option><option value="commercial">تجاري</option><option value="administrative">إداري</option><option value="urgent">استعجالي</option><option value="felonies">جنايات</option><option value="violations">مخالفات</option><option value="social">اجتماعي</option><option value="other">أخرى</option>
+</select></div>
+<div class="field"><label for="publicHearingDate">تاريخ الجلسة المعنية</label><input id="publicHearingDate" type="date" required></div>
+<div class="field"><label for="publicCaseNumber">رقم القضية</label><input id="publicCaseNumber" maxlength="120" required></div>
+<div class="field"><label for="publicNote">ملاحظة (اختياري)</label><textarea id="publicNote" maxlength="1000" placeholder="لا تكتب تفاصيل سرية أو بيانات غير لازمة."></textarea></div>
+<div class="field hidden" aria-hidden="true"><label for="publicWebsite">اترك هذا الحقل فارغًا</label><input id="publicWebsite" tabindex="-1" autocomplete="off"></div>
+</div><div class="actions"><button class="btn" id="publicSubmit" type="submit">إرسال الطلب</button><button class="btn secondary" type="reset">تفريغ الحقول</button></div><div id="publicStatus" class="status" role="status" aria-live="polite"></div></form>
+</section>
+<section id="loginPanel" class="panel">
+<h2>تسجيل الدخول</h2><p class="muted">استخدم بيانات الحساب الذي أنشأه الأدمن العام.</p>
+<form id="loginForm"><div class="grid"><div class="field"><label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" required></div><div class="field"><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول</button></div></form>
+</section>
+<section id="appPanel" class="hidden">
+<div class="panel"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h2>لوحة العمل</h2><div id="whoami" class="muted"></div><div class="muted">النطاق: <span id="courtLabel"></span></div></div><button id="logout" class="btn secondary">تسجيل الخروج</button></div></div>
+<section id="requestFormPanel" class="panel hidden"><h2>تسجيل طلب جديد</h2><p class="muted">يُسجّل الطلب من طرف المساعد بناءً على اتصال المحامي.</p>
+<form id="requestForm"><div class="grid">
+<div class="field"><label for="caseNumber">رقم القضية</label><input id="caseNumber" maxlength="120" required></div>
+<div class="field"><label for="lawyerName">اسم المحامي ولقبه</label><input id="lawyerName" maxlength="160" required></div>
+<div class="field"><label for="clientName">اسم الموكل</label><input id="clientName" maxlength="160" required></div>
+<div class="field"><label for="clientRole">صفة الموكل في القضية</label><select id="clientRole" required><option value="">اختر الصفة</option><option value="defendant">المتهم</option><option value="victim">الضحية</option></select></div>
+<div class="field"><label for="accreditationDate">تاريخ الاعتماد</label><input id="accreditationDate" type="date" required></div>
+<div class="field"><label for="requestType">نوع الطلب</label><select id="requestType"><option value="postpone">تأجيل</option><option value="advance">تسبيق (مرافعة)</option></select></div>
+<div class="field"><label for="assistantSessionType">نوع الجلسة</label><select id="assistantSessionType" required><option value="misdemeanor">جنح</option><option value="civil">مدني</option><option value="real_estate">عقاري</option><option value="family">شؤون الأسرة</option><option value="commercial">تجاري</option><option value="administrative">إداري</option><option value="urgent">استعجالي</option><option value="felonies">جنايات</option><option value="violations">مخالفات</option><option value="social">اجتماعي</option><option value="other">أخرى</option></select></div>
+<div class="field"><label for="hearingDate">تاريخ الجلسة</label><input id="hearingDate" type="date" required></div>
+<div class="field"><label for="requestNote">ملاحظة (اختياري)</label><textarea id="requestNote" maxlength="1000"></textarea></div>
+</div><div class="actions"><button class="btn" type="submit">تسجيل الطلب</button><button class="btn secondary" type="reset">تفريغ الحقول</button></div></form></section>
+<section id="adminPanel" class="panel hidden">
+<h2>إدارة المنصة والهيئات</h2><p class="muted">هذه الصلاحيات مخصصة للأدمن العام فقط. كلمة مرور المسؤول الجديد تظهر مرة واحدة بعد إنشاء الحساب.</p>
+<div class="panel" style="padding:15px;margin:14px 0">
+<h3>إضافة هيئة قضائية</h3>
+<form id="createCourtForm"><div class="grid">
+<div class="field"><label for="courtNameInput">اسم المحكمة أو المجلس</label><input id="courtNameInput" maxlength="160" required></div>
+<div class="field"><label for="courtKindInput">نوع الهيئة</label><select id="courtKindInput" required><option value="court">محكمة</option><option value="council">مجلس قضاء</option><option value="annex">ملحقة</option><option value="specialized">جهة متخصصة</option></select></div>
+</div><div class="actions"><button class="btn" type="submit">إضافة الهيئة</button></div></form>
+</div>
+<div class="panel" style="padding:15px;margin:14px 0">
+<h3>إنشاء حساب أدمن لهيئة</h3><p class="muted">أدخل بريدًا إلكترونيًا صالحًا للمسؤول. لا تنشئ حسابات ببريد لا تملكه الهيئة أو لا يمكنها استلامه.</p>
+<form id="createAssistantForm"><div class="grid">
+<div class="field"><label for="newName">اسم المسؤول</label><input id="newName" maxlength="160" required></div>
+<div class="field"><label for="newEmail">البريد الإلكتروني للحساب</label><input id="newEmail" type="email" autocomplete="off" required></div>
+<div class="field"><label for="newCourt">الهيئة القضائية</label><select id="newCourt" required></select></div>
+</div><div class="actions"><button class="btn" type="submit">إنشاء حساب أدمن للهيئة</button></div></form>
+<div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div>
+</div>
+<h3>قائمة الهيئات وصلاحياتها</h3><p class="muted">يمكن تعديل اسم الهيئة أو تفعيلها وتعطيلها. الحذف النهائي متاح فقط عندما لا توجد طلبات أو حسابات مرتبطة بها.</p>
+<div class="tablewrap"><table style="min-width:650px"><thead><tr><th>اسم الهيئة</th><th>النوع</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="courtRows"><tr><td colspan="4">جارٍ تحميل الهيئات…</td></tr></tbody></table></div>
+</section>
+<section class="panel"><div class="toolbar"><div><h2>الطلبات المسجلة</h2><div class="muted">تظهر للمساعد طلبات هيئته فقط، وللأدمن العام جميع الطلبات.</div></div><button class="btn secondary" id="refresh" type="button">تحديث القائمة</button></div><div class="tablewrap"><table><thead><tr><th>رقم القضية</th><th>الموكل وصفته</th><th>المحامي</th><th>الهيئة</th><th>الطلب والجلسة</th><th>تاريخ الجلسة</th><th>الحالة / الإجراء</th><th>ملاحظة</th></tr></thead><tbody id="requestRows"><tr><td colspan="8">سجّل الدخول لعرض الطلبات.</td></tr></tbody></table></div></section>
+</section>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+</main><footer class="footer">Barreau Alger · لا تُرفع ملفات PDF عبر هذه الخدمة. تُحفظ بيانات الطلبات في قاعدة البيانات بعد تهيئتها.</footer>
+<script type="module">
+const refresh = document.getElementById("refresh");
+refresh?.addEventListener("click", () => location.reload());
+</script>
+</body></html>

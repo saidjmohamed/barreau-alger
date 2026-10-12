@@ -1,0 +1,10 @@
+# Supabase local project configuration
+# Public submissions remain locked until server-side CAPTCHA and rate limits are configured.
+[functions.submit-court-request]
+verify_jwt = true
+
+[functions.admin-create-assistant]
+verify_jwt = true
+
+[functions.admin-create-court-admin]
+verify_jwt = true
