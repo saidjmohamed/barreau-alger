@@ -1,0 +1,8 @@
+# Supabase local project configuration
+# Public request submission is unauthenticated; protect it with server-side validation
+# and CAPTCHA/rate limits before production use.
+[functions.submit-court-request]
+verify_jwt = false
+
+[functions.admin-create-assistant]
+verify_jwt = true
