@@ -28,9 +28,11 @@ create unique index if not exists profiles_one_assistant_per_court
 create table if not exists public.court_requests (
   id uuid primary key default gen_random_uuid(),
   court_id uuid not null references public.courts(id),
-  case_number text,
+  case_number text not null,
   lawyer_full_name text not null,
   lawyer_accreditation_date date not null,
+  client_name text not null,
+  client_role text not null check (client_role in ('defendant','victim')),
   request_type text not null check (request_type in ('advance','postpone')),
   session_type text not null check (session_type in ('misdemeanor','civil','real_estate','family','commercial','administrative','urgent','felonies','violations','social','other')),
   hearing_date date not null,
