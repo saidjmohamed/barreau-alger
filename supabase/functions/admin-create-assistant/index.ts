@@ -36,8 +36,13 @@ Deno.serve(async (req) => {
   });
   const token = authorization.replace(/^Bearer\s+/i, "");
   const { data: authData, error: authError } = await adminClient.auth.getUser(token);
-  if (authError || !authData.user || authData.user.app_metadata?.role !== "admin") {
-    return json({ error: "غير مصرح. يلزم حساب الأدمن العام." }, 403);
+  if (authError || !authData.user || authData.user.app_metadata?.role !== "admin" || authData.user.app_metadata?.active !== true) {
+    return json({ error: "غير مصرح. يلزم حساب الأدمن العام النشط." }, 403);
+  }
+  const { data: adminProfile, error: adminProfileError } = await adminClient
+    .from("profiles").select("role,active,court_id").eq("id", authData.user.id).maybeSingle();
+  if (adminProfileError || !adminProfile || adminProfile.role !== "admin" || !adminProfile.active || adminProfile.court_id !== null) {
+    return json({ error: "ملف الأدمن العام غير صالح." }, 403);
   }
 
   let body: { email?: string; display_name?: string; court_id?: string };
