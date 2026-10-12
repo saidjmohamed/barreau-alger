@@ -28,7 +28,7 @@ create unique index if not exists profiles_one_assistant_per_court
 create table if not exists public.court_requests (
   id uuid primary key default gen_random_uuid(),
   court_id uuid not null references public.courts(id),
-  case_number text not null,
+  case_number text,
   lawyer_full_name text not null,
   lawyer_accreditation_date date not null,
   request_type text not null check (request_type in ('advance','postpone')),
@@ -68,8 +68,8 @@ alter table public.profiles enable row level security;
 alter table public.court_requests enable row level security;
 
 -- Authorization is based on server-managed app_metadata claims, never user_metadata.
-create policy "authenticated users can read active courts"
-on public.courts for select to authenticated
+create policy "public can read active courts"
+on public.courts for select to anon, authenticated
 using (active = true or ((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true'));
 
 create policy "admins manage courts"
@@ -121,7 +121,8 @@ on public.court_requests for delete to authenticated
 using (((select auth.jwt())->'app_metadata'->>'role' = 'admin' and (select auth.jwt())->'app_metadata'->>'active' = 'true'));
 
 revoke all on public.courts, public.profiles, public.court_requests from anon;
-grant select, insert, update, delete on public.courts to authenticated;
+grant select on public.courts to anon, authenticated;
+grant insert, update, delete on public.courts to authenticated;
 grant select on public.profiles to authenticated;
 grant select, insert, update, delete on public.court_requests to authenticated;
 
@@ -138,3 +139,16 @@ insert into public.courts (name, kind) values
   ('محكمة شراقة', 'court'),
   ('محكمة الجنايات', 'specialized')
 on conflict (name) do nothing;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
+     AND NOT EXISTS (
+       SELECT 1 FROM pg_publication_tables
+       WHERE pubname = 'supabase_realtime'
+         AND schemaname = 'public'
+         AND tablename = 'court_requests'
+     ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.court_requests;
+  END IF;
+END $$;
