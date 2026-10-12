@@ -1,0 +1,11 @@
+{
+  "name": "Barreau Alger - أدوات المحامي",
+  "short_name": "Barreau Alger",
+  "lang": "ar-DZ",
+  "dir": "rtl",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#10243a",
+  "description": "أدوات PDF مهنية تعالج الملفات داخل المتصفح."
+}
