@@ -124,9 +124,9 @@ $("createAssistantForm").addEventListener("submit", async (e) => {
   });
   if (error || data?.error) return status("تعذر إنشاء الحساب: " + (data?.error || error.message), "bad");
   $("credentialResult").classList.remove("hidden");
-  $("credentialResult").innerHTML = "<strong>تم إنشاء الحساب. انسخ كلمة المرور الآن واحفظها بأمان؛ لن تظهر مجددًا.</strong><div class='copybox'>البريد: " + escapeHtml(data.email) + "<br>المساعد: " + escapeHtml(data.display_name) + "<br>الهيئة: " + escapeHtml(data.court_name) + "<br>كلمة المرور المؤقتة: <strong>" + escapeHtml(data.temporary_password) + "</strong></div>";
+  $("credentialResult").innerHTML = "<strong>تم إنشاء الحساب. انسخ كلمة المرور الآن واحفظها بأمان؛ لن تظهر مجددًا.</strong><div class='copybox'>البريد: " + escapeHtml(data.email) + "<br>المسؤول: " + escapeHtml(data.display_name) + "<br>الهيئة: " + escapeHtml(data.court_name) + "<br>كلمة المرور المؤقتة: <strong>" + escapeHtml(data.temporary_password) + "</strong></div>";
   $("createAssistantForm").reset();
-  status("تم إنشاء حساب المساعد.", "good");
+  status("تم إنشاء حساب أدمن الهيئة.", "good");
 });
 async function loadCourts() {
   const { data, error } = await supabase.from("courts").select("id,name,kind,active").order("name");
