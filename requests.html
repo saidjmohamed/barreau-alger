@@ -77,7 +77,9 @@ $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!configured) return status("لم تُضبط بيانات Supabase بعد. راجع supabase/README.md.", "bad");
   status("جارٍ تسجيل الدخول…");
-  const { error } = await supabase.auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+  const entered = $("email").value.trim();
+  const email = entered.includes("@") ? entered : entered.toLowerCase() + "@alger.com";
+  const { error } = await supabase.auth.signInWithPassword({ email, password: $("password").value });
   if (error) return status("تعذر تسجيل الدخول: " + error.message, "bad");
   await loadApp();
 });
@@ -119,14 +121,14 @@ $("createAssistantForm").addEventListener("submit", async (e) => {
   status("جارٍ إنشاء الحساب…");
   const { data: sessionData } = await supabase.auth.getSession();
   const { data, error } = await supabase.functions.invoke("admin-create-court-admin", {
-    body: { email: $("newEmail").value.trim(), display_name: $("newName").value.trim(), court_id: $("newCourt").value },
+    body: { action: "create", username: $("newUsername").value.trim(), password: $("newPassword").value, display_name: $("newName").value.trim(), court_id: $("newCourt").value },
     headers: { Authorization: "Bearer " + sessionData.session.access_token }
   });
   if (error || data?.error) return status("تعذر إنشاء الحساب: " + (data?.error || error.message), "bad");
   $("credentialResult").classList.remove("hidden");
-  $("credentialResult").innerHTML = "<strong>تم إنشاء الحساب. انسخ كلمة المرور الآن واحفظها بأمان؛ لن تظهر مجددًا.</strong><div class='copybox'>البريد: " + escapeHtml(data.email) + "<br>المسؤول: " + escapeHtml(data.display_name) + "<br>الهيئة: " + escapeHtml(data.court_name) + "<br>كلمة المرور المؤقتة: <strong>" + escapeHtml(data.temporary_password) + "</strong></div>";
+  $("credentialResult").textContent = "تم إنشاء الحساب بنجاح. اسم المستخدم: " + data.username + " — احتفظ بكلمة المرور التي أدخلتها.";
   $("createAssistantForm").reset();
-  status("تم إنشاء حساب أدمن الهيئة.", "good");
+  status("تم إنشاء حساب المسؤول.", "good");
 });
 async function loadCourts() {
   const { data, error } = await supabase.from("courts").select("id,name,kind,active").order("name");
@@ -251,7 +253,7 @@ else {
 </section>
 <section id="loginPanel" class="panel">
 <h2>تسجيل الدخول</h2><p class="muted">استخدم بيانات الحساب الذي أنشأه الأدمن العام.</p>
-<form id="loginForm"><div class="grid"><div class="field"><label for="email">البريد الإلكتروني</label><input id="email" type="email" autocomplete="username" required></div><div class="field"><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول</button></div></form>
+<form id="loginForm"><div class="grid"><div class="field"><label for="email">اسم المستخدم</label><input id="email" type="text" autocomplete="username" required></div><div class="field"><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول</button></div></form>
 </section>
 <section id="appPanel" class="hidden">
 <div class="panel"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h2>لوحة العمل</h2><div id="whoami" class="muted"></div><div class="muted">النطاق: <span id="courtLabel"></span></div></div><button id="logout" class="btn secondary">تسجيل الخروج</button></div></div>
@@ -277,12 +279,13 @@ else {
 </div><div class="actions"><button class="btn" type="submit">إضافة الهيئة</button></div></form>
 </div>
 <div class="panel" style="padding:15px;margin:14px 0">
-<h3>إنشاء حساب أدمن لهيئة</h3><p class="muted">أدخل بريدًا إلكترونيًا صالحًا للمسؤول. لا تنشئ حسابات ببريد لا تملكه الهيئة أو لا يمكنها استلامه.</p>
+<h3>إنشاء حساب أدمن لهيئة</h3><p class="muted">أنشئ اسم مستخدم وكلمة مرور للمسؤول. يمكنك تغيير كلمة المرور أو حذف الحساب لاحقًا.</p>
 <form id="createAssistantForm"><div class="grid">
 <div class="field"><label for="newName">اسم المسؤول</label><input id="newName" maxlength="160" required></div>
-<div class="field"><label for="newEmail">البريد الإلكتروني للحساب</label><input id="newEmail" type="email" autocomplete="off" required></div>
+<div class="field"><label for="newUsername">اسم المستخدم</label><input id="newUsername" type="text" minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]{3,40}" required>
+<div class="field"><label for="newPassword">كلمة المرور</label><input id="newPassword" type="password" minlength="10" maxlength="128" required></div></div>
 <div class="field"><label for="newCourt">الهيئة القضائية</label><select id="newCourt" required></select></div>
-</div><div class="actions"><button class="btn" type="submit">إنشاء حساب أدمن للهيئة</button></div></form>
+</div><div class="actions"><button class="btn" type="submit">إنشاء حساب المسؤول</button></div></form>
 <div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div>
 </div>
 <h3>قائمة الهيئات وصلاحياتها</h3><p class="muted">يمكن تعديل اسم الهيئة أو تفعيلها وتعطيلها. الحذف النهائي متاح فقط عندما لا توجد طلبات أو حسابات مرتبطة بها.</p>
