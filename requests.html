@@ -130,6 +130,39 @@ $("createAssistantForm").addEventListener("submit", async (e) => {
   $("createAssistantForm").reset();
   status("تم إنشاء حساب المسؤول.", "good");
 });
+async function loadCourtAdminAccounts() {
+  if (currentProfile?.role !== "admin") return;
+  const { data: session } = await supabase.auth.getSession();
+  const { data, error } = await supabase.functions.invoke("admin-create-court-admin", {
+    body: { action: "list" },
+    headers: { Authorization: "Bearer " + session.session.access_token }
+  });
+  if (error || data?.error) {
+    $("courtAdminRows").innerHTML = '<tr><td colspan="3">تعذر تحميل الحسابات.</td></tr>';
+    return;
+  }
+  $("courtAdminRows").innerHTML = (data.accounts || []).map(a =>
+    '<tr><td><strong>' + escapeHtml(a.username || "—") + '</strong></td><td>' + escapeHtml(a.display_name) + '<br><span class="muted">' + escapeHtml(a.courts?.name || "هيئة غير محددة") + '</span></td><td><div class="actions"><button class="btn secondary" data-password-for="' + escapeHtml(a.id) + '">تغيير كلمة المرور</button><button class="btn danger" data-delete-admin="' + escapeHtml(a.id) + '">حذف الحساب</button></div></td></tr>'
+  ).join("") || '<tr><td colspan="3">لا توجد حسابات مسؤولي هيئات.</td></tr>';
+  $("courtAdminRows").querySelectorAll("[data-password-for]").forEach(btn => btn.addEventListener("click", async () => {
+    const password = prompt("أدخل كلمة المرور الجديدة (10 أحرف على الأقل):");
+    if (password === null) return;
+    if (password.length < 10) return status("كلمة المرور قصيرة؛ استخدم 10 أحرف على الأقل.", "bad");
+    const { data: s } = await supabase.auth.getSession();
+    const result = await supabase.functions.invoke("admin-create-court-admin", { body: { action: "set_password", account_id: btn.dataset.passwordFor, password }, headers: { Authorization: "Bearer " + s.session.access_token } });
+    if (result.error || result.data?.error) return status("تعذر تغيير كلمة المرور.", "bad");
+    status("تم تغيير كلمة المرور.", "good");
+  }));
+  $("courtAdminRows").querySelectorAll("[data-delete-admin]").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm("هل تريد حذف حساب مسؤول هذه الهيئة نهائيًا؟")) return;
+    const { data: s } = await supabase.auth.getSession();
+    const result = await supabase.functions.invoke("admin-create-court-admin", { body: { action: "delete", account_id: btn.dataset.deleteAdmin }, headers: { Authorization: "Bearer " + s.session.access_token } });
+    if (result.error || result.data?.error) return status("تعذر حذف الحساب.", "bad");
+    status("تم حذف الحساب.", "good");
+    await loadCourtAdminAccounts();
+    await loadCourts();
+  }));
+}
 async function loadCourts() {
   const { data, error } = await supabase.from("courts").select("id,name,kind,active").order("name");
   if (error) throw error;
@@ -146,6 +179,7 @@ async function loadCourts() {
   $("newCourt").innerHTML = '<option value="">اختر الهيئة</option>' + options;
   $("courtLabel").textContent = ["assistant","court_admin"].includes(currentProfile?.role) ? (data.find(c => c.id === currentProfile.court_id)?.name || "هيئة غير محددة") : "جميع الهيئات";
   if (currentProfile?.role === "admin") {
+    await loadCourtAdminAccounts();
     const kinds = { council: "مجلس قضاء", court: "محكمة", annex: "ملحقة", specialized: "جهة متخصصة" };
     $("courtRows").innerHTML = data.map(c => '<tr><td><input data-court-name="' + escapeHtml(c.id) + '" maxlength="160" value="' + escapeHtml(c.name) + '" aria-label="اسم الهيئة"></td><td><select data-court-kind="' + escapeHtml(c.id) + '" aria-label="نوع الهيئة">' + Object.entries(kinds).map(([k,v]) => '<option value="' + k + '"' + (c.kind === k ? " selected" : "") + '>' + v + '</option>').join("") + '</select></td><td>' + (c.active ? '<span class="pill">نشطة</span>' : '<span class="pill">معطلة</span>') + '</td><td><div class="actions"><button class="btn secondary" data-court-save="' + escapeHtml(c.id) + '">حفظ التعديل</button><button class="btn secondary" data-court-toggle="' + escapeHtml(c.id) + '" data-active="' + String(c.active) + '">' + (c.active ? "تعطيل" : "تفعيل") + '</button><button class="btn danger" data-court-delete="' + escapeHtml(c.id) + '">حذف نهائي</button></div></td></tr>').join("") || '<tr><td colspan="4">لا توجد هيئات.</td></tr>';
     $("courtRows").querySelectorAll("[data-court-save]").forEach(btn => btn.addEventListener("click", async () => {
@@ -287,6 +321,7 @@ else {
 <div class="field"><label for="newCourt">الهيئة القضائية</label><select id="newCourt" required></select></div>
 </div><div class="actions"><button class="btn" type="submit">إنشاء حساب المسؤول</button></div></form>
 <div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div>
+<h3>الحسابات المنشأة</h3><div class="tablewrap"><table style="min-width:520px"><thead><tr><th>اسم المستخدم</th><th>المسؤول والهيئة</th><th>الإجراءات</th></tr></thead><tbody id="courtAdminRows"><tr><td colspan="3">جارٍ تحميل الحسابات…</td></tr></tbody></table></div>
 </div>
 <h3>قائمة الهيئات وصلاحياتها</h3><p class="muted">يمكن تعديل اسم الهيئة أو تفعيلها وتعطيلها. الحذف النهائي متاح فقط عندما لا توجد طلبات أو حسابات مرتبطة بها.</p>
 <div class="tablewrap"><table style="min-width:650px"><thead><tr><th>اسم الهيئة</th><th>النوع</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="courtRows"><tr><td colspan="4">جارٍ تحميل الهيئات…</td></tr></tbody></table></div>
