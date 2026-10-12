@@ -11,7 +11,11 @@ function json(body: unknown, status = 200) {
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
-const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(value));
+const validDate = (value: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00.000Z");
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
@@ -41,7 +45,7 @@ Deno.serve(async (req) => {
     "misdemeanor", "civil", "real_estate", "family", "commercial",
     "administrative", "urgent", "felonies", "violations", "social", "other"
   ]);
-  if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(courtId) ||
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(courtId) ||
       lawyerName.length < 4 || lawyerName.length > 160 ||
       !validDate(accreditationDate) || !validDate(hearingDate) ||
       !allowedRequestTypes.has(requestType) || !allowedSessionTypes.has(sessionType) ||
