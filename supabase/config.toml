@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.admin-create-assistant]
 verify_jwt = true
+
+[functions.admin-create-court-admin]
+verify_jwt = true
