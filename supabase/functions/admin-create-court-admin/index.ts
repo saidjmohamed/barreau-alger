@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
 
   const accountId = String(b.account_id || "");
   const { data: account, error: accountError } = await db.from("profiles")
-    .select("id,role,court_id,username").eq("id", accountId).maybeSingle();
+    .select("id,role,court_id,username,display_name,active").eq("id", accountId).maybeSingle();
   if (accountError || !account || account.role !== "court_admin")
     return json({ error: "حساب مسؤول المحكمة غير موجود." }, 404);
 
@@ -87,9 +87,28 @@ Deno.serve(async (req) => {
     return json({ ok: true, message: "تم تغيير كلمة المرور." });
   }
   if (action === "delete") {
-    const { error } = await db.auth.admin.deleteUser(account.id);
-    if (error) return json({ error: "تعذر حذف الحساب." }, 400);
-    return json({ ok: true, message: "تم حذف الحساب." });
+    // Remove the application profile first: this project has no FK cascade from profiles.id to auth.users.id.
+    // Keep the court and all court-request data untouched.
+    const { data: removedProfile, error: profileDeleteError } = await db.from("profiles")
+      .delete().eq("id", account.id).select("id").maybeSingle();
+    if (profileDeleteError || !removedProfile)
+      return json({ error: "تعذر إزالة ملف المسؤول من التطبيق؛ لم يُحذف حساب المصادقة." }, 400);
+
+    const { error: authDeleteError } = await db.auth.admin.deleteUser(account.id);
+    if (authDeleteError) {
+      // Restore the profile if Auth deletion fails, avoiding a half-deleted account.
+      const { error: restoreError } = await db.from("profiles").insert({
+        id: account.id,
+        username: account.username,
+        display_name: account.display_name,
+        role: account.role,
+        court_id: account.court_id,
+        active: account.active,
+      });
+      if (restoreError) return json({ error: "تعذر حذف حساب المصادقة وفشل استرجاع ملف المسؤول؛ يلزم تدخل إداري." }, 500);
+      return json({ error: "تعذر حذف حساب المصادقة؛ أُعيد ملف المسؤول ولم يُحذف الحساب." }, 400);
+    }
+    return json({ ok: true, message: "تم حذف حساب المسؤول وملفه؛ بقيت الهيئة وبيانات الطلبات دون تغيير." });
   }
   return json({ error: "عملية غير معروفة." }, 400);
 });
