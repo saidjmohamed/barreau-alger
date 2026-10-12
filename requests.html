@@ -12,8 +12,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.54.0";
 
 // ضع عنوان مشروع Supabase ومفتاح publishable/anon هنا بعد إعداد المشروع.
 // لا تضع service_role أو أي مفتاح سري في هذا الملف.
-const SUPABASE_URL = "YOUR_SUPABASE_URL";
-const SUPABASE_PUBLISHABLE_KEY = "YOUR_SUPABASE_PUBLISHABLE_KEY";
+const SUPABASE_URL = "https://iivwofxxogillblumlhv.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_11zgv5lruoMnkx9NbLM8Eg_mhac62sy";
 const configured = !SUPABASE_URL.startsWith("YOUR_") && !SUPABASE_PUBLISHABLE_KEY.startsWith("YOUR_");
 const supabase = configured ? createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY) : null;
 const $ = (id) => document.getElementById(id);
