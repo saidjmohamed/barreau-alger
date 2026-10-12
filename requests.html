@@ -41,6 +41,8 @@ $("publicRequestForm").addEventListener("submit", async (e) => {
     court_id: $("publicCourt").value,
     lawyer_full_name: $("publicLawyerName").value.trim(),
     lawyer_accreditation_date: $("publicAccreditationDate").value,
+    client_name: $("publicClientName").value.trim(),
+    client_role: $("publicClientRole").value,
     request_type: $("publicRequestType").value,
     session_type: $("publicSessionType").value,
     hearing_date: $("publicHearingDate").value,
@@ -88,6 +90,8 @@ $("requestForm").addEventListener("submit", async (e) => {
     case_number: $("caseNumber").value.trim(),
     lawyer_full_name: $("lawyerName").value.trim(),
     lawyer_accreditation_date: $("accreditationDate").value,
+    client_name: $("clientName").value.trim(),
+    client_role: $("clientRole").value,
     request_type: $("requestType").value,
     session_type: $("assistantSessionType").value,
     hearing_date: $("hearingDate").value,
@@ -132,16 +136,17 @@ async function loadCourts() {
   $("courtLabel").textContent = currentProfile?.role === "assistant" ? (data.find(c => c.id === currentProfile.court_id)?.name || "هيئة غير محددة") : "جميع الهيئات";
 }
 async function loadRequests() {
-  const { data, error } = await supabase.from("court_requests").select("id,case_number,lawyer_full_name,lawyer_accreditation_date,request_type,session_type,hearing_date,note,status,status_note,created_at,court_id,courts(name)").order("created_at", { ascending: false }).limit(300);
+  const { data, error } = await supabase.from("court_requests").select("id,case_number,lawyer_full_name,lawyer_accreditation_date,client_name,client_role,request_type,session_type,hearing_date,note,status,status_note,created_at,court_id,courts(name)").order("created_at", { ascending: false }).limit(300);
   if (error) return status("تعذر تحميل الطلبات: " + error.message, "bad");
   const labels = { new: "جديد", in_progress: "قيد المعالجة", completed: "تم", rejected: "مرفوض" };
+  const clientRoleLabels = { defendant: "المتهم", victim: "الضحية" };
   $("requestRows").innerHTML = data.map(r => {
     const admin = currentProfile.role === "admin";
     const canEdit = admin || currentProfile.court_id === r.court_id;
     const courtName = r.courts?.name || "";
     const statusControl = canEdit ? '<select data-status="' + escapeHtml(r.id) + '">' + ["new","in_progress","completed","rejected"].map(s => '<option value="' + s + '"' + (r.status === s ? " selected" : "") + '>' + labels[s] + '</option>').join("") + '</select><input data-note="' + escapeHtml(r.id) + '" placeholder="ملاحظة الحالة" value="' + escapeHtml(r.status_note || "") + '"><button class="btn secondary" data-save="' + escapeHtml(r.id) + '">حفظ</button>' : '<span class="pill">' + labels[r.status] + '</span>';
-    return '<tr><td>' + escapeHtml(r.case_number || "—") + '</td><td>' + escapeHtml(r.lawyer_full_name) + '<br><span class="muted">تاريخ الاعتماد: ' + escapeHtml(r.lawyer_accreditation_date) + '</span></td><td>' + escapeHtml(courtName) + '</td><td>' + requestLabels[r.request_type] + '<br><span class="muted">' + (sessionLabels[r.session_type] || "—") + '</span></td><td>' + escapeHtml(r.hearing_date) + '</td><td>' + statusControl + '</td><td>' + escapeHtml(r.note || "") + '</td></tr>';
-  }).join("") || '<tr><td colspan="7">لا توجد طلبات مسجلة.</td></tr>';
+    return '<tr><td>' + escapeHtml(r.case_number) + '</td><td>' + escapeHtml(r.client_name) + '<br><span class="muted">' + (clientRoleLabels[r.client_role] || "—") + '</span></td><td>' + escapeHtml(r.lawyer_full_name) + '<br><span class="muted">تاريخ الاعتماد: ' + escapeHtml(r.lawyer_accreditation_date) + '</span></td><td>' + escapeHtml(courtName) + '</td><td>' + requestLabels[r.request_type] + '<br><span class="muted">' + (sessionLabels[r.session_type] || "—") + '</span></td><td>' + escapeHtml(r.hearing_date) + '</td><td>' + statusControl + '</td><td>' + escapeHtml(r.note || "") + '</td></tr>';
+  }).join("") || '<tr><td colspan="8">لا توجد طلبات مسجلة.</td></tr>';
   $("requestRows").querySelectorAll("[data-save]").forEach(btn => btn.addEventListener("click", async () => {
     const id = btn.dataset.save, statusValue = $("requestRows").querySelector('[data-status="' + id + '"]').value;
     const statusNote = $("requestRows").querySelector('[data-note="' + id + '"]').value.trim() || null;
@@ -197,12 +202,14 @@ else {
 <div class="field"><label for="publicCourt">المحكمة أو المجلس</label><select id="publicCourt" required><option value="">تحميل الهيئات…</option></select></div>
 <div class="field"><label for="publicLawyerName">اسم المحامي ولقبه</label><input id="publicLawyerName" maxlength="160" autocomplete="name" required></div>
 <div class="field"><label for="publicAccreditationDate">تاريخ الاعتماد</label><input id="publicAccreditationDate" type="date" required></div>
-<div class="field"><label for="publicRequestType">نوع الطلب</label><select id="publicRequestType" required><option value="postpone">تأجيل</option><option value="advance">تسبيق (مرافعة)</option></select></div>
+<div class="field"><label for="publicClientName">اسم الموكل</label><input id="publicClientName" maxlength="160" autocomplete="off" required></div>
+<div class="field"><label for="publicClientRole">صفة الموكل في القضية</label><select id="publicClientRole" required><option value="">اختر الصفة</option><option value="defendant">المتهم</option><option value="victim">الضحية</option></select></div>
+<div class="field"><label for="publicRequestType">نوع الطلب</label><select id="publicRequestType" required><option value="">اختر نوع الطلب</option><option value="postpone">تأجيل</option><option value="advance">تسبيق (مرافعة)</option></select></div>
 <div class="field"><label for="publicSessionType">نوع الجلسة</label><select id="publicSessionType" required>
 <option value="">اختر نوع الجلسة</option><option value="misdemeanor">جنح</option><option value="civil">مدني</option><option value="real_estate">عقاري</option><option value="family">شؤون الأسرة</option><option value="commercial">تجاري</option><option value="administrative">إداري</option><option value="urgent">استعجالي</option><option value="felonies">جنايات</option><option value="violations">مخالفات</option><option value="social">اجتماعي</option><option value="other">أخرى</option>
 </select></div>
 <div class="field"><label for="publicHearingDate">تاريخ الجلسة المعنية</label><input id="publicHearingDate" type="date" required></div>
-<div class="field"><label for="publicCaseNumber">رقم القضية (اختياري)</label><input id="publicCaseNumber" maxlength="120"></div>
+<div class="field"><label for="publicCaseNumber">رقم القضية</label><input id="publicCaseNumber" maxlength="120" required></div>
 <div class="field"><label for="publicNote">ملاحظة (اختياري)</label><textarea id="publicNote" maxlength="1000" placeholder="لا تكتب تفاصيل سرية أو بيانات غير لازمة."></textarea></div>
 <div class="field hidden" aria-hidden="true"><label for="publicWebsite">اترك هذا الحقل فارغًا</label><input id="publicWebsite" tabindex="-1" autocomplete="off"></div>
 </div><div class="actions"><button class="btn" id="publicSubmit" type="submit">إرسال الطلب</button><button class="btn secondary" type="reset">تفريغ الحقول</button></div><div id="publicStatus" class="status" role="status" aria-live="polite"></div></form>
@@ -217,6 +224,8 @@ else {
 <form id="requestForm"><div class="grid">
 <div class="field"><label for="caseNumber">رقم القضية</label><input id="caseNumber" maxlength="120" required></div>
 <div class="field"><label for="lawyerName">اسم المحامي ولقبه</label><input id="lawyerName" maxlength="160" required></div>
+<div class="field"><label for="clientName">اسم الموكل</label><input id="clientName" maxlength="160" required></div>
+<div class="field"><label for="clientRole">صفة الموكل في القضية</label><select id="clientRole" required><option value="">اختر الصفة</option><option value="defendant">المتهم</option><option value="victim">الضحية</option></select></div>
 <div class="field"><label for="accreditationDate">تاريخ الاعتماد</label><input id="accreditationDate" type="date" required></div>
 <div class="field"><label for="requestType">نوع الطلب</label><select id="requestType"><option value="postpone">تأجيل</option><option value="advance">تسبيق (مرافعة)</option></select></div>
 <div class="field"><label for="assistantSessionType">نوع الجلسة</label><select id="assistantSessionType" required><option value="misdemeanor">جنح</option><option value="civil">مدني</option><option value="real_estate">عقاري</option><option value="family">شؤون الأسرة</option><option value="commercial">تجاري</option><option value="administrative">إداري</option><option value="urgent">استعجالي</option><option value="felonies">جنايات</option><option value="violations">مخالفات</option><option value="social">اجتماعي</option><option value="other">أخرى</option></select></div>
@@ -230,7 +239,7 @@ else {
 <div class="field"><label for="newCourt">الهيئة القضائية</label><select id="newCourt" required></select></div>
 </div><div class="actions"><button class="btn" type="submit">إنشاء حساب مساعد</button></div></form>
 <div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div></section>
-<section class="panel"><div class="toolbar"><div><h2>الطلبات المسجلة</h2><div class="muted">تظهر للمساعد طلبات هيئته فقط، وللأدمن العام جميع الطلبات.</div></div><button class="btn secondary" id="refresh" type="button">تحديث القائمة</button></div><div class="tablewrap"><table><thead><tr><th>رقم القضية</th><th>المحامي</th><th>الهيئة</th><th>الطلب</th><th>تاريخ الجلسة</th><th>الحالة / الإجراء</th><th>ملاحظة</th></tr></thead><tbody id="requestRows"><tr><td colspan="7">سجّل الدخول لعرض الطلبات.</td></tr></tbody></table></div></section>
+<section class="panel"><div class="toolbar"><div><h2>الطلبات المسجلة</h2><div class="muted">تظهر للمساعد طلبات هيئته فقط، وللأدمن العام جميع الطلبات.</div></div><button class="btn secondary" id="refresh" type="button">تحديث القائمة</button></div><div class="tablewrap"><table><thead><tr><th>رقم القضية</th><th>الموكل وصفته</th><th>المحامي</th><th>الهيئة</th><th>الطلب والجلسة</th><th>تاريخ الجلسة</th><th>الحالة / الإجراء</th><th>ملاحظة</th></tr></thead><tbody id="requestRows"><tr><td colspan="8">سجّل الدخول لعرض الطلبات.</td></tr></tbody></table></div></section>
 </section>
 <div id="status" class="status" role="status" aria-live="polite"></div>
 </main><footer class="footer">Barreau Alger · لا تُرفع ملفات PDF عبر هذه الخدمة. تُحفظ بيانات الطلبات في قاعدة البيانات بعد تهيئتها.</footer>
