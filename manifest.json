@@ -1,11 +1,8 @@
 {
-  "name": "Barreau Alger - أدوات المحامي",
-  "short_name": "Barreau Alger",
-  "lang": "ar-DZ",
-  "dir": "rtl",
-  "start_url": "./",
-  "display": "standalone",
-  "background_color": "#f4f6f9",
-  "theme_color": "#10243a",
-  "description": "أدوات PDF مهنية تعالج الملفات داخل المتصفح."
+  "id":"./","name":"Barreau Alger - بوابة المحامي الجزائري","short_name":"Barreau Alger","lang":"ar-DZ","dir":"rtl",
+  "start_url":"./index.html","scope":"./","display":"standalone","display_override":["standalone","minimal-ui"],"orientation":"any",
+  "background_color":"#f4f6f9","theme_color":"#10243a",
+  "description":"أدوات المحامي الجزائري وخدمات رقمية بواجهة عربية متوافقة مع الهاتف واللوحة والحاسوب.",
+  "icons":[{"src":"./icons/app-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"},{"src":"./icons/app-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"maskable"}],
+  "categories":["productivity","utilities"]
 }
