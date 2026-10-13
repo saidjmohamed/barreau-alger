@@ -171,12 +171,12 @@ async function loadCourtAdminAccounts() {
     headers: { Authorization: "Bearer " + session.session.access_token }
   });
   if (error || data?.error) {
-    $("courtAdminRows").innerHTML = '<tr><td colspan="3">تعذر تحميل الحسابات.</td></tr>';
+    $("courtAdminRows").innerHTML = '<tr><td colspan="4">تعذر تحميل الحسابات.</td></tr>';
     return;
   }
   $("courtAdminRows").innerHTML = (data.accounts || []).map(a =>
-    '<tr><td><strong>' + escapeHtml(a.username || "—") + '</strong></td><td>' + escapeHtml(a.display_name) + '<br><span class="muted">' + escapeHtml(a.courts?.name || "هيئة غير محددة") + '</span></td><td><div class="actions"><button class="btn secondary" data-password-for="' + escapeHtml(a.id) + '">تغيير كلمة المرور</button><button class="btn danger" data-delete-admin="' + escapeHtml(a.id) + '">حذف الحساب</button></div></td></tr>'
-  ).join("") || '<tr><td colspan="3">لا توجد حسابات مسؤولي هيئات.</td></tr>';
+    '<tr><td><strong>' + escapeHtml(a.username || "—") + '</strong></td><td>' + escapeHtml(a.display_name) + '<br><span class="muted">' + escapeHtml(a.courts?.name || "هيئة غير محددة") + '</span></td><td><span class="muted">لا يمكن استرجاع كلمة المرور الحالية؛ عيّن كلمة جديدة لعرضها.</span></td><td><div class="actions"><button class="btn secondary" data-password-for="' + escapeHtml(a.id) + '">تعيين كلمة مرور</button><button class="btn danger" data-delete-admin="' + escapeHtml(a.id) + '">حذف الحساب</button></div></td></tr>'
+  ).join("") || '<tr><td colspan="4">لا توجد حسابات مسؤولي هيئات.</td></tr>';
   $("courtAdminRows").querySelectorAll("[data-password-for]").forEach(btn => btn.addEventListener("click", async () => {
     const password = prompt("أدخل كلمة المرور الجديدة (10 أحرف على الأقل):");
     if (password === null) return;
@@ -184,7 +184,7 @@ async function loadCourtAdminAccounts() {
     const { data: s } = await supabase.auth.getSession();
     const result = await supabase.functions.invoke("admin-create-court-admin", { body: { action: "set_password", account_id: btn.dataset.passwordFor, password }, headers: { Authorization: "Bearer " + s.session.access_token } });
     if (result.error || result.data?.error) return status("تعذر تغيير كلمة المرور.", "bad");
-    status("تم تغيير كلمة المرور.", "good");
+    $("credentialResult").classList.remove("hidden"); $("credentialResult").textContent = "تم تعيين كلمة مرور جديدة للحساب " + (btn.closest("tr")?.querySelector("td strong")?.textContent || "") + ". كلمة المرور الجديدة: " + password + " — احفظها الآن؛ لن تُخزّن كنص ظاهر بعد مغادرة هذه الجلسة."; status("تم تعيين كلمة المرور الجديدة وعرضها للأدمن العام.", "good");
   }));
   $("courtAdminRows").querySelectorAll("[data-delete-admin]").forEach(btn => btn.addEventListener("click", async () => {
     if (!confirm("هل تريد حذف حساب مسؤول هذه الهيئة نهائيًا؟")) return;
@@ -356,11 +356,11 @@ else {
 <form id="createAssistantForm"><div class="grid">
 <div class="field"><label for="newName">اسم المسؤول</label><input id="newName" maxlength="160" required></div>
 <div class="field"><label for="newUsername">اسم المستخدم</label><input id="newUsername" type="text" minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]{3,40}" value="barreau" required>
-<div class="field"><label for="newPassword">كلمة المرور</label><input id="newPassword" type="password" minlength="10" maxlength="128" value="Barreau-alger" required></div></div>
+<div class="field"><label for="newPassword">كلمة المرور</label><input id="newPassword" type="text" minlength="10" maxlength="128" value="Barreau-alger" autocomplete="new-password" required></div></div>
 <div class="field"><label for="newCourt">الهيئة القضائية</label><select id="newCourt" required></select></div>
 </div><div class="actions"><button class="btn" type="submit">إنشاء حساب المسؤول</button></div></form>
 <div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div>
-<h3>الحسابات المنشأة</h3><div class="tablewrap"><table style="min-width:520px"><thead><tr><th>اسم المستخدم</th><th>المسؤول والهيئة</th><th>الإجراءات</th></tr></thead><tbody id="courtAdminRows"><tr><td colspan="3">جارٍ تحميل الحسابات…</td></tr></tbody></table></div>
+<h3>الحسابات المنشأة</h3><div class="tablewrap"><table style="min-width:720px"><thead><tr><th>اسم المستخدم</th><th>المسؤول والهيئة</th><th>كلمة المرور</th><th>الإجراءات</th></tr></thead><tbody id="courtAdminRows"><tr><td colspan="3">جارٍ تحميل الحسابات…</td></tr></tbody></table></div>
 </div>
 <h3>قائمة الهيئات وصلاحياتها</h3><p class="muted">يمكن تعديل اسم الهيئة أو تفعيلها وتعطيلها. الحذف النهائي متاح فقط عندما لا توجد طلبات أو حسابات مرتبطة بها.</p>
 <div class="tablewrap"><table style="min-width:650px"><thead><tr><th>اسم الهيئة</th><th>النوع</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="courtRows"><tr><td colspan="4">جارٍ تحميل الهيئات…</td></tr></tbody></table></div>
