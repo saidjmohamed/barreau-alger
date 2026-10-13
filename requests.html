@@ -82,13 +82,21 @@ async function loadPublicCourts() {
 $("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!configured) return status("لم تُضبط بيانات Supabase بعد. راجع supabase/README.md.", "bad");
-  status("جارٍ تسجيل الدخول…");
+  status("جارٍ تسجيل دخول مسؤول الهيئة…");
   const entered = $("email").value.trim();
   const courtId = $("loginCourt").value;
-  if (!entered.includes("@") && !courtId) return status("اختر الهيئة القضائية المرتبط بها الحساب.", "bad");
-  const email = entered.includes("@") ? entered : entered.toLowerCase() + "-" + courtId + "@alger.com";
+  if (!courtId) return status("اختر الهيئة القضائية أولًا.", "bad");
+  const email = entered.toLowerCase() + "-" + courtId + "@alger.com";
   const { error } = await supabase.auth.signInWithPassword({ email, password: $("password").value });
-  if (error) return status("تعذر تسجيل الدخول: " + error.message, "bad");
+  if (error) return status("تعذر تسجيل الدخول: تحقق من الهيئة واسم المستخدم وكلمة المرور.", "bad");
+  await loadApp();
+});
+$("adminLoginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!configured) return status("لم تُضبط بيانات Supabase بعد. راجع supabase/README.md.", "bad");
+  status("جارٍ تسجيل دخول الأدمن العام…");
+  const { error } = await supabase.auth.signInWithPassword({ email: $("adminEmail").value.trim(), password: $("adminPassword").value });
+  if (error) return status("تعذر تسجيل دخول الأدمن العام: تحقق من البريد الإلكتروني وكلمة المرور.", "bad");
   await loadApp();
 });
 $("logout").addEventListener("click", async () => { await supabase.auth.signOut(); location.reload(); });
@@ -264,6 +272,7 @@ async function loadApp() {
   }
   currentProfile = profile;
   $("loginPanel").classList.add("hidden");
+  $("adminLoginPanel").classList.add("hidden");
   $("appPanel").classList.remove("hidden");
   $("whoami").textContent = profile.display_name + " — " + ({admin:"الأدمن العام",court_admin:"أدمن الهيئة",assistant:"مساعد الهيئة"}[profile.role] || "مستخدم");
   $("requestFormPanel").classList.toggle("hidden", profile.role !== "assistant");
@@ -292,6 +301,14 @@ else {
 <header class="top"><div class="brandline"><svg class="org-logo" viewBox="0 0 160 160" role="img" aria-label="شعار منظمة محامي الجزائر" xmlns="http://www.w3.org/2000/svg"><circle cx="80" cy="80" r="75" fill="#050505" stroke="#c8a65e" stroke-width="2.4"/><circle cx="80" cy="80" r="66" fill="none" stroke="#c8a65e" stroke-width="1"/><g fill="none" stroke="#d4b36a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M80 36V94M51 48H109M80 37l-5 7h10z"/><path d="M51 48L36 75M51 48l15 27M109 48L94 75M109 48l15 27"/><path d="M28 75Q51 89 74 75M86 75Q109 89 132 75"/><path d="M80 94l-8 9h16zM61 108h38l8 9H53zM58 121h44M63 126h34"/><path d="M27 98v22M22 120h10M133 98v22M128 120h10"/></g><g fill="#e0c17c" font-family="Tahoma,Arial,sans-serif" text-anchor="middle"><text x="80" y="20" font-size="8.3" font-weight="bold">منظمة محامي الجزائر</text><text x="80" y="143" font-size="7.3" font-weight="bold">ORDRE DES AVOCATS</text><text x="80" y="151" font-size="6.2">D'ALGER</text></g></svg><h1>منظمة محامي الجزائر | Barreau Alger</h1></div><p><a href="./index.html" style="color:#f0d8a8">العودة إلى خدمات PDF</a> · <a href="./organization.html" style="color:#f0d8a8">الواجهة التعريفية للمنظمة</a> · خدمة التسبيقات والتأجيلات · حسابات مسؤولي الهيئات والأدمن العام</p></header>
 <main class="wrap">
 <div class="notice">نموذج المحامي مصمم للإرسال دون حساب، لكن الإرسال العام موقوف مؤقتًا على مستوى الخادم حتى إعداد CAPTCHA والتحقق منه لمنع الإغراق. لا تعتمد على النموذج لإرسال طلب حقيقي قبل إتمام هذه الخطوة.</div>
+<section id="loginPanel" class="panel">
+<h2>دخول مسؤولي المحاكم والهيئات</h2><p class="muted">هذا الدخول مخصص لمسؤولي الهيئات. اختر الهيئة ثم أدخل اسم المستخدم وكلمة المرور الخاصة بها.</p>
+<form id="loginForm"><div class="grid"><div class="field"><label for="email">اسم المستخدم أو البريد الإلكتروني للأدمن العام</label><input id="email" type="text" autocomplete="username" required></div><div class="field"><label for="loginCourt">الهيئة القضائية</label><select id="loginCourt"><option value="">اختر الهيئة القضائية</option></select><small class="muted">الأدمن العام يسجل الدخول ببريده الإلكتروني ولا يحتاج إلى اختيار هيئة.</small></div><div class="field"><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول</button></div></form>
+</section>
+<section id="adminLoginPanel" class="panel">
+<h2>دخول الأدمن العام</h2><p class="muted">هذا الدخول مخصص للأدمن العام فقط، باستخدام البريد الإلكتروني وكلمة المرور الإدارية.</p>
+<form id="adminLoginForm"><div class="grid"><div class="field"><label for="adminEmail">البريد الإلكتروني للأدمن العام</label><input id="adminEmail" type="email" autocomplete="username" required></div><div class="field"><label for="adminPassword">كلمة المرور</label><input id="adminPassword" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول الأدمن العام</button></div></form>
+</section>
 <section class="panel" id="publicRequestPanel">
 <h2>إرسال طلب تسبيق أو تأجيل</h2><p class="muted">التسبيق يعني طلب المرافعة. لا يلزم تسجيل الدخول لإرسال الطلب.</p>
 <form id="publicRequestForm"><div class="grid">
@@ -310,10 +327,7 @@ else {
 <div class="field hidden" aria-hidden="true"><label for="publicWebsite">اترك هذا الحقل فارغًا</label><input id="publicWebsite" tabindex="-1" autocomplete="off"></div>
 </div><div class="actions"><button class="btn" id="publicSubmit" type="submit">إرسال الطلب</button><button class="btn secondary" type="reset">تفريغ الحقول</button></div><div id="publicStatus" class="status" role="status" aria-live="polite"></div></form>
 </section>
-<section id="loginPanel" class="panel">
-<h2>تسجيل الدخول</h2><p class="muted">استخدم بيانات الحساب الذي أنشأه الأدمن العام.</p>
-<form id="loginForm"><div class="grid"><div class="field"><label for="email">اسم المستخدم أو البريد الإلكتروني للأدمن العام</label><input id="email" type="text" autocomplete="username" required></div><div class="field"><label for="loginCourt">الهيئة القضائية</label><select id="loginCourt"><option value="">اختر الهيئة القضائية</option></select><small class="muted">الأدمن العام يسجل الدخول ببريده الإلكتروني ولا يحتاج إلى اختيار هيئة.</small></div><div class="field"><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول</button></div></form>
-</section>
+
 <section id="appPanel" class="hidden">
 <div class="panel"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h2>لوحة العمل</h2><div id="whoami" class="muted"></div><div class="muted">النطاق: <span id="courtLabel"></span></div></div><button id="logout" class="btn secondary">تسجيل الخروج</button></div></div>
 <section id="requestFormPanel" class="panel hidden"><h2>تسجيل طلب جديد</h2><p class="muted">يُسجّل الطلب من طرف المساعد بناءً على اتصال المحامي.</p>
