@@ -72,8 +72,11 @@ async function loadPublicCourts() {
     $("publicStatus").textContent = "تعذر تحميل قائمة الهيئات. يرجى المحاولة لاحقًا.";
     return;
   }
-  $("publicCourt").innerHTML = '<option value="">اختر المحكمة أو المجلس</option>' +
+  const courtOptions = '<option value="">اختر المحكمة أو المجلس</option>' +
     data.map(c => '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>').join("");
+  $("publicCourt").innerHTML = courtOptions;
+  const loginCourt = $("loginCourt");
+  if (loginCourt) loginCourt.innerHTML = courtOptions;
 }
 
 $("loginForm").addEventListener("submit", async (e) => {
@@ -81,7 +84,9 @@ $("loginForm").addEventListener("submit", async (e) => {
   if (!configured) return status("لم تُضبط بيانات Supabase بعد. راجع supabase/README.md.", "bad");
   status("جارٍ تسجيل الدخول…");
   const entered = $("email").value.trim();
-  const email = entered.includes("@") ? entered : entered.toLowerCase() + "@alger.com";
+  const courtId = $("loginCourt").value;
+  if (!entered.includes("@") && !courtId) return status("اختر الهيئة القضائية المرتبط بها الحساب.", "bad");
+  const email = entered.includes("@") ? entered : entered.toLowerCase() + "-" + courtId + "@alger.com";
   const { error } = await supabase.auth.signInWithPassword({ email, password: $("password").value });
   if (error) return status("تعذر تسجيل الدخول: " + error.message, "bad");
   await loadApp();
@@ -290,7 +295,7 @@ else {
 </section>
 <section id="loginPanel" class="panel">
 <h2>تسجيل الدخول</h2><p class="muted">استخدم بيانات الحساب الذي أنشأه الأدمن العام.</p>
-<form id="loginForm"><div class="grid"><div class="field"><label for="email">اسم المستخدم</label><input id="email" type="text" autocomplete="username" required></div><div class="field"><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول</button></div></form>
+<form id="loginForm"><div class="grid"><div class="field"><label for="email">اسم المستخدم أو البريد الإلكتروني للأدمن العام</label><input id="email" type="text" autocomplete="username" required></div><div class="field"><label for="loginCourt">الهيئة القضائية</label><select id="loginCourt"><option value="">اختر الهيئة القضائية</option></select><small class="muted">الأدمن العام يسجل الدخول ببريده الإلكتروني ولا يحتاج إلى اختيار هيئة.</small></div><div class="field"><label for="password">كلمة المرور</label><input id="password" type="password" autocomplete="current-password" required></div></div><div class="actions"><button class="btn" type="submit">دخول</button></div></form>
 </section>
 <section id="appPanel" class="hidden">
 <div class="panel"><div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap"><div><h2>لوحة العمل</h2><div id="whoami" class="muted"></div><div class="muted">النطاق: <span id="courtLabel"></span></div></div><button id="logout" class="btn secondary">تسجيل الخروج</button></div></div>
@@ -319,8 +324,8 @@ else {
 <h3>إنشاء حساب أدمن لهيئة</h3><p class="muted">أنشئ اسم مستخدم وكلمة مرور للمسؤول. يمكنك تغيير كلمة المرور أو حذف الحساب لاحقًا.</p>
 <form id="createAssistantForm"><div class="grid">
 <div class="field"><label for="newName">اسم المسؤول</label><input id="newName" maxlength="160" required></div>
-<div class="field"><label for="newUsername">اسم المستخدم</label><input id="newUsername" type="text" minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]{3,40}" required>
-<div class="field"><label for="newPassword">كلمة المرور</label><input id="newPassword" type="password" minlength="10" maxlength="128" required></div></div>
+<div class="field"><label for="newUsername">اسم المستخدم</label><input id="newUsername" type="text" minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]{3,40}" value="barreau" required>
+<div class="field"><label for="newPassword">كلمة المرور</label><input id="newPassword" type="password" minlength="10" maxlength="128" value="Barreau-alger" required></div></div>
 <div class="field"><label for="newCourt">الهيئة القضائية</label><select id="newCourt" required></select></div>
 </div><div class="actions"><button class="btn" type="submit">إنشاء حساب المسؤول</button></div></form>
 <div id="credentialResult" class="copybox hidden" style="margin-top:14px"></div>
