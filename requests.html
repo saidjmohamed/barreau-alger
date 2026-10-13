@@ -142,7 +142,7 @@ $("createAssistantForm").addEventListener("submit", async (e) => {
   });
   if (error || data?.error) return status("تعذر إنشاء الحساب: " + (data?.error || error.message), "bad");
   $("credentialResult").classList.remove("hidden");
-  $("credentialResult").textContent = "تم إنشاء الحساب بنجاح. اسم المستخدم: " + data.username + " — احتفظ بكلمة المرور التي أدخلتها.";
+  $("credentialResult").textContent = "تم إنشاء الحساب بنجاح. اسم المستخدم: " + data.username + " — كلمة المرور التي أدخلتها: " + $("newPassword").value + ". احفظها في مكان آمن.";
   $("createAssistantForm").reset();
   status("تم إنشاء حساب المسؤول.", "good");
 });
@@ -365,7 +365,7 @@ else {
 <h3>قائمة الهيئات وصلاحياتها</h3><p class="muted">يمكن تعديل اسم الهيئة أو تفعيلها وتعطيلها. الحذف النهائي متاح فقط عندما لا توجد طلبات أو حسابات مرتبطة بها.</p>
 <div class="tablewrap"><table style="min-width:650px"><thead><tr><th>اسم الهيئة</th><th>النوع</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="courtRows"><tr><td colspan="4">جارٍ تحميل الهيئات…</td></tr></tbody></table></div>
 </section>
-<section class="panel"><div class="toolbar"><div><h2>الطلبات المسجلة</h2><div class="muted">تظهر للمساعد طلبات هيئته فقط، وللأدمن العام جميع الطلبات.</div></div><button class="btn secondary" id="refresh" type="button">تحديث القائمة</button></div><div class="tablewrap"><table><thead><tr><th>رقم القضية</th><th>الموكل وصفته</th><th>المحامي</th><th>الهيئة</th><th>الطلب والجلسة</th><th>تاريخ الجلسة</th><th>الحالة / الإجراء</th><th>ملاحظة</th></tr></thead><tbody id="requestRows"><tr><td colspan="8">سجّل الدخول لعرض الطلبات.</td></tr></tbody></table></div></section>
+<section class="panel"><div class="toolbar"><div><h2>الطلبات المسجلة</h2><div class="muted">الأدمن العام يرى جميع الطلبات الموجهة إلى كل الهيئات؛ أما مسؤولو ومساعدو الهيئات فيرون طلبات هيئتهم فقط.</div></div><button class="btn secondary" id="refresh" type="button">تحديث القائمة</button></div><div class="tablewrap"><table><thead><tr><th>رقم القضية</th><th>الموكل وصفته</th><th>المحامي</th><th>الهيئة</th><th>الطلب والجلسة</th><th>تاريخ الجلسة</th><th>الحالة / الإجراء</th><th>ملاحظة</th></tr></thead><tbody id="requestRows"><tr><td colspan="8">سجّل الدخول لعرض الطلبات.</td></tr></tbody></table></div></section>
 </section>
 <div id="status" class="status" role="status" aria-live="polite"></div>
 </main><footer class="footer">Barreau Alger · لا تُرفع ملفات PDF عبر هذه الخدمة. تُحفظ بيانات الطلبات في قاعدة البيانات بعد تهيئتها.</footer>
