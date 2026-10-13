@@ -138,6 +138,23 @@ $("createAssistantForm").addEventListener("submit", async (e) => {
   $("createAssistantForm").reset();
   status("تم إنشاء حساب المسؤول.", "good");
 });
+$("setupAllCourtAdmins").addEventListener("click", async () => {
+  if (!currentProfile || currentProfile.role !== "admin") return status("هذه العملية متاحة للأدمن العام فقط.", "bad");
+  const password = $("newPassword").value;
+  if (password.length < 10) return status("أدخل كلمة مرور من 10 أحرف على الأقل في حقل كلمة المرور.", "bad");
+  if (!confirm("سيتم إنشاء أو تحديث حساب مسؤول لكل هيئة نشطة باسم المستخدم barreau وكلمة المرور المحددة. هل تريد المتابعة؟")) return;
+  status("جارٍ تهيئة حسابات مسؤولي الهيئات…");
+  const { data: session } = await supabase.auth.getSession();
+  const { data, error } = await supabase.functions.invoke("admin-create-court-admin", {
+    body: { action: "setup_all", password },
+    headers: { Authorization: "Bearer " + session.session.access_token }
+  });
+  if (error || data?.error) return status("تعذر تهيئة الحسابات: " + (data?.error || error.message), "bad");
+  const failed = (data.results || []).filter(x => x.status.startsWith("failed"));
+  const details = (data.results || []).map(x => x.court + ": " + x.status).join("\n");
+  status("اكتملت المعالجة: " + (data.results || []).length + " هيئة، " + failed.length + " إخفاقات.\n" + details, failed.length ? "bad" : "good");
+  await loadCourts();
+});
 async function loadCourtAdminAccounts() {
   if (currentProfile?.role !== "admin") return;
   const { data: session } = await supabase.auth.getSession();
